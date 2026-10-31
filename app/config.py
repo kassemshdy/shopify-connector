@@ -1,0 +1,56 @@
+"""Settings, from the environment only."""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Literal
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
+
+    app_env: Literal["development", "test", "production"] = "development"
+    log_level: str = "INFO"
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/connector_dev"
+    # Public origin of this service; Shopify's redirect and webhooks point here.
+    public_base_url: str = "http://localhost:8100"
+
+    # Signs the OAuth state. Never the encryption key below.
+    secret_key: str = "dev-insecure-secret-change-me"
+    # Fernet key for store tokens, tenant webhook secrets and Cloudflare tokens.
+    encryption_key: str | None = None
+
+    # The one Shopify app every tenant shares.
+    shopify_api_key: str | None = None
+    shopify_api_secret: str | None = None
+    shopify_api_version: str = "2025-07"
+    shopify_scopes: str = "read_products,write_products,write_publications,read_publications"
+
+    worker_poll_seconds: int = 15
+    http_timeout_seconds: float = 30.0
+
+    @property
+    def shopify_enabled(self) -> bool:
+        return bool(self.shopify_api_key and self.shopify_api_secret and self.encryption_key)
+
+    def enforce_production_safety(self) -> None:
+        if self.app_env != "production":
+            return
+        problems: list[str] = []
+        if self.secret_key == "dev-insecure-secret-change-me" or len(self.secret_key) < 32:
+            problems.append("SECRET_KEY must be a strong random value")
+        if not self.encryption_key:
+            problems.append("ENCRYPTION_KEY is required")
+        elif self.encryption_key == self.secret_key:
+            problems.append("ENCRYPTION_KEY must differ from SECRET_KEY")
+        if not (self.shopify_api_key and self.shopify_api_secret):
+            problems.append("SHOPIFY_API_KEY and SHOPIFY_API_SECRET are required")
+        if problems:
+            raise RuntimeError("Unsafe production configuration:\n  - " + "\n  - ".join(problems))
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
