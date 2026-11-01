@@ -11,6 +11,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app import bootstrap
 from app.api import shopify_routes, v1
 from app.config import Settings, get_settings
 from app.db import SessionLocal
@@ -41,6 +42,9 @@ def create_app(settings: Settings | None = None, *, worker: bool = True) -> Fast
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         settings.enforce_production_safety()
+        if settings.bootstrap_tenants:
+            with SessionLocal() as db:
+                bootstrap.apply(db, settings, settings.bootstrap_tenants)
         task = asyncio.create_task(run_worker(settings)) if worker else None
         yield
         if task is not None:

@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     shopify_api_version: str = "2025-07"
     shopify_scopes: str = "read_products,write_products,write_publications,read_publications"
 
+    # JSON list of websites to create or update at startup (app/bootstrap.py).
+    # Remove once applied: it carries tenant keys in plaintext.
+    bootstrap_tenants: str | None = None
+
     worker_poll_seconds: int = 15
     http_timeout_seconds: float = 30.0
 

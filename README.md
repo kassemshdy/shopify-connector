@@ -62,6 +62,14 @@ Optional settings for a website:
 - `rotate-key` issues a new API key, and the old one stops working at once.
 - `set --active no` turns a website off.
 
+### Without a shell
+
+When there is no shell on the deployment, set `BOOTSTRAP_TENANTS` to a JSON
+list of websites (see `app/bootstrap.py`). They are created or updated at
+startup, with an API key and webhook secret you choose. **Remove the variable
+once the deploy has applied it**: the tenant is in the database, and the
+variable would keep the key in plaintext.
+
 ## Deploy
 
 The service runs one Docker image on Railway with its own Postgres. The start
