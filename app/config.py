@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # Remove once applied: it carries tenant keys in plaintext.
     bootstrap_tenants: str | None = None
 
+    # Error reports; nothing is sent without a DSN (app/observability.py).
+    sentry_dsn: str | None = None
+    sentry_release: str | None = None
+
     worker_poll_seconds: int = 15
     http_timeout_seconds: float = 30.0
 

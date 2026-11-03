@@ -86,6 +86,7 @@ command runs `alembic upgrade head`.
 | `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET` | The shared Shopify app's credentials |
 | `SHOPIFY_API_VERSION` | Pinned, default `2025-07` |
 | `APP_ENV=production` | Refuses to start with unsafe settings |
+| `SENTRY_DSN`, `SENTRY_RELEASE` | Optional error reports; no query string, body or key is sent |
 
 **Shopify app settings**, in the Partner or Dev Dashboard:
 - App URL: `<PUBLIC_BASE_URL>`
@@ -95,3 +96,11 @@ command runs `alembic upgrade head`.
 
 `app/uninstalled` and `shop/update` are subscribed automatically on every
 connect.
+
+**The App URL page** (`GET /`, `app/api/home.py`) is what a merchant sees on
+opening the app in their Shopify admin. With Shopify's signed launch
+parameters (checked, and at most ten minutes old) it shows which website the
+store is connected to and how the sync is going, with a link back to that
+website; without them it describes the app and names no store. It can be
+framed only by that shop's admin. Its wording is a placeholder until the
+owners choose their own.

@@ -12,10 +12,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app import bootstrap
-from app.api import shopify_routes, v1
+from app.api import home, shopify_routes, v1
 from app.config import Settings, get_settings
 from app.db import SessionLocal
 from app.errors import AppError
+from app.observability import init_sentry
 from app.services import events, sync
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None, *, worker: bool = True) -> Fast
     # httpx logs every URL it calls; keep it quiet so no request detail lands
     # in the deployment logs.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    init_sentry(settings)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -62,6 +64,7 @@ def create_app(settings: Settings | None = None, *, worker: bool = True) -> Fast
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    app.include_router(home.router)
     app.include_router(v1.router)
     app.include_router(shopify_routes.router)
     return app
