@@ -44,3 +44,18 @@ def test_a_new_tenant_without_a_proper_key_is_refused(db: Session, settings: Set
                                                    "webhook_secret": "w"}]))
     with pytest.raises(ValueError, match="key and secret"):
         bootstrap.apply(db, settings, json.dumps([{"slug": "x"}]))
+
+
+def test_a_tenant_can_share_another_tenants_cloudflare_zone(
+    db: Session, settings: Settings
+) -> None:
+    first = {"slug": "site", "api_key": KEY, "webhook_secret": "w",
+             "cloudflare_zone_id": "z", "cloudflare_token": "cf"}
+    second = {"slug": "staging", "api_key": "sc_live_" + "s" * 43, "webhook_secret": "w2",
+              "cloudflare_from": "site"}
+    bootstrap.apply(db, settings, json.dumps([first, second]))
+    staging = db.scalars(select(Tenant).where(Tenant.slug == "staging")).one()
+    assert staging.cloudflare_zone_id == "z"
+    assert decrypt(settings, staging.cloudflare_token_enc or "") == "cf"
+    with pytest.raises(ValueError, match="no tenant"):
+        bootstrap.apply(db, settings, json.dumps([{"slug": "staging", "cloudflare_from": "nope"}]))

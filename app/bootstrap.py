@@ -11,6 +11,10 @@ its slug is new, or updates its settings if it exists:
       "cloudflare_zone_id": "...", "cloudflare_token": "...",
       "signup_url": "https://..."}]
 
+``"cloudflare_from": "<slug>"`` gives a tenant the Cloudflare zone and token
+of another tenant already registered, copied encrypted, so a second site on
+the same domain (a staging copy, say) needs no one to handle the token.
+
 The key and secret are chosen by the operator here (instead of printed by
 the CLI), stored the same way: the key as its hash, the secret encrypted.
 Remove the variable once the deploy has applied it -- the tenant lives in
@@ -63,6 +67,15 @@ def apply(db: Session, settings: Settings, raw: str | None) -> list[str]:
         for field in ("webhook_url", "subdomain_base", "signup_url", "cloudflare_zone_id"):
             if field in entry:
                 setattr(tenant, field, entry[field] or None)
+        if "cloudflare_from" in entry:
+            db.flush()  # an earlier entry in this list may be the source
+            source = db.scalars(
+                select(Tenant).where(Tenant.slug == str(entry["cloudflare_from"]))
+            ).first()
+            if source is None:
+                raise ValueError(f"bootstrap tenant {slug}: no tenant {entry['cloudflare_from']}")
+            tenant.cloudflare_zone_id = source.cloudflare_zone_id
+            tenant.cloudflare_token_enc = source.cloudflare_token_enc
         if "cloudflare_token" in entry:
             token = entry["cloudflare_token"]
             tenant.cloudflare_token_enc = encrypt(settings, str(token)) if token else None
