@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app import bootstrap
-from app.api import home, shopify_routes, v1
+from app.api import home, operator, shopify_routes, v1
 from app.config import Settings, get_settings
 from app.db import SessionLocal
 from app.errors import AppError
@@ -65,6 +65,7 @@ def create_app(settings: Settings | None = None, *, worker: bool = True) -> Fast
         return {"status": "ok"}
 
     app.include_router(home.router)
+    app.include_router(operator.router)
     app.include_router(v1.router)
     app.include_router(shopify_routes.router)
     return app

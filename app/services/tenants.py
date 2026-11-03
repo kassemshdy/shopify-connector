@@ -1,4 +1,4 @@
-"""Registering websites. Used by the operator CLI, never by tenants."""
+"""Registering websites. Used by the operator CLI and page, never by tenants."""
 
 from __future__ import annotations
 
@@ -34,6 +34,25 @@ def rotate_key(db: Session, tenant: Tenant) -> str:
     tenant.api_key_hash = hash_key(key)
     db.commit()
     return key
+
+
+def rotate_secret(db: Session, settings: Settings, tenant: Tenant) -> str:
+    secret = new_webhook_secret()
+    tenant.webhook_secret_enc = encrypt(settings, secret)
+    db.commit()
+    return secret
+
+
+def set_cloudflare(
+    db: Session, settings: Settings, tenant: Tenant, *, zone_id: str | None, token: str | None
+) -> None:
+    """Set the zone; the token is replaced only when one is given (it is never shown)."""
+    tenant.cloudflare_zone_id = zone_id or None
+    if token:
+        tenant.cloudflare_token_enc = encrypt(settings, token)
+    if not tenant.cloudflare_zone_id:
+        tenant.cloudflare_token_enc = None
+    db.commit()
 
 
 def authenticate(db: Session, key: str) -> Tenant:

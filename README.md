@@ -86,6 +86,7 @@ command runs `alembic upgrade head`.
 | `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET` | The shared Shopify app's credentials |
 | `SHOPIFY_API_VERSION` | Pinned, default `2025-07` |
 | `APP_ENV=production` | Refuses to start with unsafe settings |
+| `OPERATOR_PASSWORD` | Turns on the operator page at `/operator` (16+ characters). Unset: the page is a 404 |
 | `SENTRY_DSN`, `SENTRY_RELEASE` | Optional error reports; no query string, body or key is sent |
 
 **Shopify app settings**, in the Partner or Dev Dashboard:
@@ -104,3 +105,23 @@ store is connected to and how the sync is going, with a link back to that
 website; without them it describes the app and names no store. It can be
 framed only by that shop's admin. Its wording is a placeholder until the
 owners choose their own.
+
+
+## The operator page
+
+`/operator` (`app/api/operator.py`) is for whoever runs the connector, not
+for the websites: add a website, edit its addresses and webhook, set or share
+a Cloudflare zone, replace its API key or webhook secret, disable it, and see
+every store it has connected with its sync counts and last problem, plus its
+recent webhooks. It does what `scripts/tenant.py` does, without a shell.
+
+- One password, `OPERATOR_PASSWORD`; without it the page does not exist.
+- The session is an HttpOnly, SameSite=Strict, Secure cookie on `/operator`,
+  valid twelve hours, and invalid as soon as the password changes.
+- Every form carries a token derived from the session.
+- Five wrong passwords from one address lock it out for fifteen minutes.
+- A new key or secret is shown once, on the page that made it. The Cloudflare
+  token can be replaced but never read back.
+- Pages cannot be framed and are not cached.
+
+`tests/test_operator.py` pins each of these.

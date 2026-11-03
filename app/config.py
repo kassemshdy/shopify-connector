@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Remove once applied: it carries tenant keys in plaintext.
     bootstrap_tenants: str | None = None
 
+    # The operator page (/operator) is mounted only when this is set.
+    operator_password: str | None = None
+
     # Error reports; nothing is sent without a DSN (app/observability.py).
     sentry_dsn: str | None = None
     sentry_release: str | None = None
@@ -55,6 +58,8 @@ class Settings(BaseSettings):
             problems.append("ENCRYPTION_KEY must differ from SECRET_KEY")
         if not (self.shopify_api_key and self.shopify_api_secret):
             problems.append("SHOPIFY_API_KEY and SHOPIFY_API_SECRET are required")
+        if self.operator_password is not None and len(self.operator_password) < 16:
+            problems.append("OPERATOR_PASSWORD must be at least 16 characters")
         if problems:
             raise RuntimeError("Unsafe production configuration:\n  - " + "\n  - ".join(problems))
 
