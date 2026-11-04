@@ -35,7 +35,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import AppSettings, DbSession
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.errors import NotFound
 from app.models import Product, Store, StoreStatus, SyncState, Tenant, WebhookDelivery
 from app.services import tenants
@@ -148,11 +148,12 @@ def _page(title: str, body: str, op: Operator | None = None) -> HTMLResponse:
         f'<input type="hidden" name="csrf" value="{op.csrf}">'
         '<button>Sign out</button></form>' if op else ""
     )
+    name = escape(get_settings().app_name)
     html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex"><title>{escape(title)} · Connector operator</title>
+<meta name="robots" content="noindex"><title>{escape(title)} · {name} operator</title>
 <style>{STYLE}</style></head><body>
-<header><a href="/operator" style="text-decoration:none"><strong>Shopify Connector</strong>
+<header><a href="/operator" style="text-decoration:none"><strong>{name}</strong>
 · operator</a>{bar}</header><main>{body}</main></body></html>"""
     return HTMLResponse(html, headers={
         "Content-Security-Policy": "frame-ancestors 'none'; default-src 'self'; "

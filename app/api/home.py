@@ -30,7 +30,7 @@ LAUNCH_MAX_AGE_SECONDS = 600
 APP_BRIDGE = "https://cdn.shopify.com/shopifycloud/app-bridge.js"
 
 
-def _page(body: str, *, api_key: str | None = None) -> str:
+def _page(body: str, name: str, *, api_key: str | None = None) -> str:
     bridge = (
         f'<meta name="shopify-api-key" content="{escape(api_key)}">'
         f'<script src="{APP_BRIDGE}"></script>'
@@ -39,7 +39,7 @@ def _page(body: str, *, api_key: str | None = None) -> str:
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Shopify Connector</title>{bridge}
+<title>{escape(name)}</title>{bridge}
 <style>
 body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   margin: 0; padding: 24px; background: #f6f6f7; color: #202223; }}
@@ -65,12 +65,13 @@ def _response(html: str, frame_ancestors: str) -> HTMLResponse:
     )
 
 
-GENERIC = (
-    "<h1>Shopify Connector</h1>"
-    "<p>This app keeps a shop's products on a directory website in step with its "
-    "Shopify store. A store is connected from the website where the shop is "
-    "listed, not from here.</p>"
-)
+def _generic(name: str) -> str:
+    return (
+        f"<h1>{escape(name)}</h1>"
+        "<p>This app keeps a shop's products on a directory website in step with its "
+        "Shopify store. A store is connected from the website where the shop is "
+        "listed, not from here.</p>"
+    )
 
 
 @router.get("/")
@@ -89,7 +90,7 @@ def home(request: Request, db: DbSession, settings: AppSettings) -> HTMLResponse
         and age <= LAUNCH_MAX_AGE_SECONDS
     )
     if not launched:
-        return _response(_page(GENERIC), "'none'")
+        return _response(_page(_generic(settings.app_name), settings.app_name), "'none'")
 
     frame = f"https://{shop} https://admin.shopify.com"
     store = db.scalars(select(Store).where(Store.shop_domain == shop)).first()
@@ -100,7 +101,7 @@ def home(request: Request, db: DbSession, settings: AppSettings) -> HTMLResponse
             "dashboard on the website where it is listed and connect this store "
             "from there; your products will then appear here.</p>"
         )
-        return _response(_page(body, api_key=settings.shopify_api_key), frame)
+        return _response(_page(body, settings.app_name, api_key=settings.shopify_api_key), frame)
 
     counts: dict[SyncState, int] = {
         state: count
@@ -133,4 +134,4 @@ def home(request: Request, db: DbSession, settings: AppSettings) -> HTMLResponse
             f'<a class="button" href="{escape(tenant.origins[0])}" target="_top" '
             f'rel="noopener">Open {escape(tenant.name)}</a>'
         )
-    return _response(_page(body, api_key=settings.shopify_api_key), frame)
+    return _response(_page(body, settings.app_name, api_key=settings.shopify_api_key), frame)

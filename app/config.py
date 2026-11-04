@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     app_env: Literal["development", "test", "production"] = "development"
+    # The app's name as merchants see it in Shopify, shown on its pages too.
+    app_name: str = "Halyoon Connect"
     log_level: str = "INFO"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/connector_dev"
     # Public origin of this service; Shopify's redirect and webhooks point here.

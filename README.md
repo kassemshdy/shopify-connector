@@ -1,5 +1,7 @@
 # Shopify Connector
 
+Merchants see it as **Halyoon Connect**, the Shopify app's name.
+
 One Shopify app, many websites. A website (a **tenant**, such as Janoubona)
 lets each of its shops connect the shop's **own** Shopify store. The connector
 then keeps that store's products in step with what the website sends, gives
@@ -86,6 +88,7 @@ command runs `alembic upgrade head`.
 | `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET` | The shared Shopify app's credentials |
 | `SHOPIFY_API_VERSION` | Pinned, default `2025-07` |
 | `APP_ENV=production` | Refuses to start with unsafe settings |
+| `APP_NAME` | The app's name on its pages, default `Halyoon Connect`; keep it the same as in the Shopify dashboard |
 | `OPERATOR_PASSWORD` | Turns on the operator page at `/operator` (16+ characters). Unset: the page is a 404 |
 | `SENTRY_DSN`, `SENTRY_RELEASE` | Optional error reports; no query string, body or key is sent |
 

@@ -46,3 +46,9 @@ def test_a_store_no_website_connected_is_told_where_to_connect(
     page = client.get("/", params=launch("other.myshopify.com"))
     assert "Not connected yet" in page.text
     assert "Site" not in page.text
+
+
+def test_the_page_carries_the_apps_name(client: TestClient) -> None:
+    page = client.get("/")
+    assert "<title>Halyoon Connect</title>" in page.text
+    assert "<h1>Halyoon Connect</h1>" in page.text

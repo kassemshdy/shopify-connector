@@ -52,7 +52,7 @@ def create_app(settings: Settings | None = None, *, worker: bool = True) -> Fast
         if task is not None:
             task.cancel()
 
-    app = FastAPI(title="Shopify Connector", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
 
     @app.exception_handler(AppError)
     async def app_error(_: Request, exc: AppError) -> JSONResponse:
