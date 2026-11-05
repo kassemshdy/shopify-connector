@@ -10,7 +10,11 @@ the connector, not its tenants.
 - Every form that changes something also carries a token derived from the
   session, so a page elsewhere cannot submit one.
 - Five wrong passwords from one address in fifteen minutes block that address
-  for the rest of the window.
+  for the rest of the window, and twenty from anywhere block every address:
+  the address can be disguised, the total cannot. The address is the
+  right-most ``X-Forwarded-For`` entry, the one our own proxies added; the
+  left-most is whatever the visitor sent, and uvicorn's
+  ``--forwarded-allow-ips='*'`` would otherwise make that ``request.client``.
 - A new key or webhook secret is shown once, on the response to the action
   that made it, and is never stored in plaintext. The Cloudflare token is
   write-only: the page says whether one is set, never what it is.
@@ -45,8 +49,10 @@ router = APIRouter(prefix="/operator", include_in_schema=False)
 COOKIE = "op_session"
 SESSION_SECONDS = 12 * 3600
 MAX_FAILURES, FAILURE_WINDOW = 5, 15 * 60
+GLOBAL_MAX_FAILURES = 20
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,58}$")
 _failures: dict[str, deque[float]] = defaultdict(deque)
+_all_failures: deque[float] = deque()
 
 
 # -- guards -------------------------------------------------------------------
@@ -183,14 +189,28 @@ def _shown_once(label: str, value: str, extra: str = "") -> str:
 # -- sign in ------------------------------------------------------------------
 
 def _client(request: Request) -> str:
+    forwarded = [h.strip() for h in request.headers.get("x-forwarded-for", "").split(",")]
+    forwarded = [h for h in forwarded if h]
+    if forwarded:
+        return forwarded[-1]
     return request.client.host if request.client else "unknown"
 
 
-def _blocked(ip: str) -> bool:
-    attempts = _failures[ip]
+def _recent(attempts: deque[float]) -> int:
     while attempts and time.time() - attempts[0] > FAILURE_WINDOW:
         attempts.popleft()
-    return len(attempts) >= MAX_FAILURES
+    return len(attempts)
+
+
+def _blocked(ip: str) -> bool:
+    return (_recent(_failures[ip]) >= MAX_FAILURES
+            or _recent(_all_failures) >= GLOBAL_MAX_FAILURES)
+
+
+def _failed(ip: str) -> None:
+    now = time.time()
+    _failures[ip].append(now)
+    _all_failures.append(now)
 
 
 def _login_page(error: str = "") -> HTMLResponse:
@@ -216,7 +236,7 @@ async def login(request: Request, settings: Enabled) -> Response:
     password = (await _form(request)).get("password", "")
     assert settings.operator_password
     if not hmac.compare_digest(password.encode(), settings.operator_password.encode()):
-        _failures[ip].append(time.time())
+        _failed(ip)
         return _login_page("Wrong password.")
     _failures.pop(ip, None)
     token = jwt.encode(

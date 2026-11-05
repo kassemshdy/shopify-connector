@@ -36,6 +36,7 @@ def _client(settings: Settings, http: httpx.Client) -> TestClient:
 @pytest.fixture
 def op(op_settings: Settings, http: httpx.Client) -> Iterator[TestClient]:
     operator_module._failures.clear()
+    operator_module._all_failures.clear()
     with _client(op_settings, http) as client:
         yield client
 
@@ -169,3 +170,25 @@ def test_production_refuses_a_short_operator_password(settings: Settings) -> Non
     unsafe = settings.model_copy(update={"app_env": "production", "operator_password": "short"})
     with pytest.raises(RuntimeError, match="OPERATOR_PASSWORD"):
         unsafe.enforce_production_safety()
+
+
+def test_a_forged_forwarded_address_does_not_reset_the_lockout(op: TestClient) -> None:
+    """The visitor controls the left of X-Forwarded-For; our proxy adds the right."""
+    for n in range(5):
+        response = op.post("/operator/login", data={"password": "nope"},
+                           headers={"X-Forwarded-For": f"10.0.0.{n}, 203.0.113.7"})
+        assert "Wrong password" in response.text
+    blocked = op.post("/operator/login", data={"password": PASSWORD},
+                      headers={"X-Forwarded-For": "10.9.9.9, 203.0.113.7"},
+                      follow_redirects=False)
+    assert "Too many attempts" in blocked.text
+    assert "op_session" not in op.cookies
+
+
+def test_twenty_failures_from_anywhere_close_the_door(op: TestClient) -> None:
+    for n in range(20):
+        op.post("/operator/login", data={"password": "nope"},
+                headers={"X-Forwarded-For": f"198.51.100.{n}"})
+    fresh = op.post("/operator/login", data={"password": PASSWORD},
+                    headers={"X-Forwarded-For": "192.0.2.1"}, follow_redirects=False)
+    assert "Too many attempts" in fresh.text
