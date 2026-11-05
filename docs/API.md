@@ -118,6 +118,7 @@ Writes the shop's logo and social links into its store's live theme.
 - **The logo** is uploaded to the store's Files: Shopify fetches it from `logo_url`, which must be a public https address.
 - **Social keys:** `facebook`, `instagram`, `tiktok`, `x`, `youtube`, `pinterest`, `snapchat`.
 - **Only settings the theme declares are written** (Dawn-family themes have them all). Nothing else in the theme changes, and an unchanged profile writes nothing.
+- **Horizon-family themes** keep the logo in the same place but the social links in a `social-links` block of `sections/footer-group.json`; every such block gets the links (`instagram_url`, ...). A link the shop did not give keeps the theme's value.
 - **Not covered:** the store's name and its homepage description. Shopify gives apps no way to set them.
 
 **Errors:**

@@ -28,13 +28,22 @@ DATA = "/*\n * Shopify writes this comment.\n */\n" + json.dumps(
 )
 
 
+FOOTER = "/* generated */\n" + json.dumps({"sections": {"utilities": {
+    "type": "footer-utilities",
+    "blocks": {"social_icons": {"type": "social-links", "settings": {
+        "instagram_url": "https://www.instagram.com", "facebook_url": "https://www.facebook.com"}}},
+}}})
+
+
 class ThemeRemote(FakeRemote):
     """FakeRemote, plus a store with a Dawn-like theme and a Files area."""
 
     def __init__(self) -> None:
         super().__init__()
         self.deny_theme_write = False
+        self.footer: str | None = None  # set for a Horizon-like theme
         self.written: str | None = None
+        self.written_files: dict[str, str] = {}
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("graphql.json"):
@@ -42,12 +51,16 @@ class ThemeRemote(FakeRemote):
             query = body["query"]
             if "MainTheme" in query:
                 self.requests.append(request)
+                files = [
+                    {"filename": "config/settings_data.json", "body": {"content": DATA}},
+                    {"filename": "config/settings_schema.json", "body": {"content": SCHEMA}},
+                ]
+                if self.footer is not None:
+                    files.append({"filename": "sections/footer-group.json",
+                                  "body": {"content": self.footer}})
                 return httpx.Response(200, json={"data": {"themes": {"nodes": [{
                     "id": "gid://shopify/OnlineStoreTheme/1", "name": "Dawn",
-                    "files": {"nodes": [
-                        {"filename": "config/settings_data.json", "body": {"content": DATA}},
-                        {"filename": "config/settings_schema.json", "body": {"content": SCHEMA}},
-                    ]}}]}}})
+                    "files": {"nodes": files}}]}}})
             if "FileCreate" in query:
                 self.requests.append(request)
                 return httpx.Response(200, json={"data": {"fileCreate": {"files": [{
@@ -61,9 +74,11 @@ class ThemeRemote(FakeRemote):
                         "upsertedThemeFiles": None,
                         "userErrors": [{"field": None, "message": "Access denied",
                                         "code": "ACCESS_DENIED"}]}}})
-                self.written = body["variables"]["files"][0]["body"]["value"]
+                self.written_files = {
+                    f["filename"]: f["body"]["value"] for f in body["variables"]["files"]}
+                self.written = self.written_files.get("config/settings_data.json")
                 return httpx.Response(200, json={"data": {"themeFilesUpsert": {
-                    "upsertedThemeFiles": [{"filename": "config/settings_data.json"}],
+                    "upsertedThemeFiles": [{"filename": f} for f in self.written_files],
                     "userErrors": []}}})
         return super().__call__(request)
 
@@ -150,3 +165,26 @@ def test_an_unchanged_profile_writes_nothing() -> None:
     new, changed = profile.apply_settings(data, SCHEMA, values)
     assert changed == []
     assert json.loads(new)["current"] == values
+
+
+def test_a_horizon_footers_social_block_gets_the_links_too(
+    client: TestClient, db: Session, settings: Settings, http: httpx.Client, remote: ThemeRemote
+) -> None:
+    remote.footer = FOOTER
+    key = _connected(client, db, settings,
+                     scopes="write_products,write_publications,write_themes,write_files")
+    client.put("/v1/stores/shop-1/profile", headers=auth(key), json=PROFILE)
+    sync.drain_once(SessionLocal, settings, http)
+
+    footer = remote.written_files["sections/footer-group.json"]
+    assert footer.startswith("/* generated */\n")
+    block = json.loads(footer.split("*/", 1)[1])["sections"]["utilities"]["blocks"]["social_icons"]
+    assert block["settings"]["instagram_url"] == "https://instagram.com/lilac"
+    assert block["settings"]["tiktok_url"] == "https://tiktok.com/@lilac"
+    # A link the shop did not give is left as the theme had it.
+    assert block["settings"]["facebook_url"] == "https://www.facebook.com"
+
+
+def test_a_footer_without_a_social_block_is_not_written() -> None:
+    text = json.dumps({"sections": {"main": {"type": "footer", "blocks": {}}}})
+    assert profile.apply_social_blocks(text, {"instagram": "https://x.test"}) == (text, [])
