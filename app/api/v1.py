@@ -8,6 +8,7 @@ from fastapi import APIRouter, Path, Response, status
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentTenant, DbSession, Http, ShopifySettings
+from app.errors import Conflict
 from app.models import Job, Product, Store, SyncState, Tenant
 from app.schemas import (
     BulkIn,
@@ -15,13 +16,16 @@ from app.schemas import (
     ConnectOut,
     ProductIn,
     ProductOut,
+    ProfileIn,
     Queued,
     StoreOut,
     SubdomainIn,
     TenantOut,
 )
 from app.services import products as product_service
+from app.services import profile as profile_service
 from app.services.stores import StoreService, get_store
+from app.services.sync import enqueue
 
 router = APIRouter(prefix="/v1", tags=["v1"])
 
@@ -120,6 +124,28 @@ def subdomain(
     store = get_store(db, tenant, store_ref)
     StoreService(db, settings, http).assign_subdomain(tenant, store, payload.subdomain)
     return store_out(db, tenant, store)
+
+
+@router.put(
+    "/stores/{store_ref}/profile", response_model=Queued, status_code=status.HTTP_202_ACCEPTED
+)
+def put_profile(
+    store_ref: Ref, payload: ProfileIn, tenant: CurrentTenant, db: DbSession,
+    settings: ShopifySettings,
+) -> Queued:
+    """Queue the shop's logo and social links for its store's live theme."""
+    store = get_store(db, tenant, store_ref)
+    if not store.is_live:
+        raise Conflict("not_connected", "The store is not connected.")
+    missing = profile_service.missing_scopes(store)
+    if missing:
+        raise Conflict(
+            "reconnect_required",
+            "Connect the store again to grant theme access: " + ", ".join(sorted(missing)),
+        )
+    enqueue(db, store, profile_service.PROFILE, payload.model_dump(mode="json"))
+    db.commit()
+    return Queued(queued=1)
 
 
 @router.put(
