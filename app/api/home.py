@@ -52,6 +52,7 @@ dt {{ color: #6d7175; }} dd {{ margin: 0; }}
 a.button {{ display: inline-block; margin-top: 16px; padding: 10px 16px; border-radius: 8px;
   background: #008060; color: #fff; text-decoration: none; }}
 .error {{ color: #8e1f0b; }}
+h2 {{ font-size: 16px; margin: 20px 0 8px; }}
 </style></head><body><main>{body}</main></body></html>"""
 
 
@@ -135,3 +136,55 @@ def home(request: Request, db: DbSession, settings: AppSettings) -> HTMLResponse
             f'rel="noopener">Open {escape(tenant.name)}</a>'
         )
     return _response(_page(body, settings.app_name, api_key=settings.shopify_api_key), frame)
+
+
+# PLACEHOLDER COPY: the two pages below are written to pass Shopify's review and
+# say only what the code does; the owners have not yet chosen their wording.
+_UPDATED = "5 November 2026"
+
+
+def _contact(settings: AppSettings) -> str:
+    email = settings.support_email
+    if not email:
+        return "<p>Contact the website where your shop is listed.</p>"
+    return f'<p>Email <a href="mailto:{escape(email)}">{escape(email)}</a>.</p>'
+
+
+@router.get("/privacy")
+def privacy(settings: AppSettings) -> HTMLResponse:
+    name = escape(settings.app_name)
+    body = f"""<h1>{name} privacy policy</h1>
+<p>Last updated {_UPDATED}.</p>
+<p>{name} connects a merchant's Shopify store to the directory website where the shop
+is listed, and sends the products the merchant manages on that website to the store.</p>
+<h2>What we store</h2>
+<ul>
+<li>The store's address (<code>*.myshopify.com</code>), name, currency and the access
+token Shopify issues at installation. The token is encrypted at rest.</li>
+<li>The products sent from the website and the Shopify ids they were given.</li>
+<li>When the website asks for it, the shop's logo and social links, written into the
+store's theme.</li>
+</ul>
+<h2>What we do not store</h2>
+<p>No customer, order or payment data. The app requests no customer or order
+scopes, so Shopify never gives it any.</p>
+<h2>Who processes it</h2>
+<p>The app runs on Railway; DNS for store addresses is managed on Cloudflare; error
+reports go to Sentry with personal data removed.</p>
+<h2>Deletion</h2>
+<p>Uninstalling the app deletes the access token at once. 48 hours later Shopify
+asks us to erase the store, and every record of it is deleted.</p>
+<h2>Contact</h2>{_contact(settings)}"""
+    return _response(_page(body, settings.app_name), "'none'")
+
+
+@router.get("/support")
+def support(settings: AppSettings) -> HTMLResponse:
+    name = escape(settings.app_name)
+    body = f"""<h1>{name} support</h1>
+<p>Your store is connected, and your products are managed, from the website where your
+shop is listed. Open the app in your Shopify admin to see whether the store is connected
+and how the product sync is going.</p>
+<h2>Contact</h2>{_contact(settings)}
+<p><a href="/privacy">Privacy policy</a></p>"""
+    return _response(_page(body, settings.app_name), "'none'")

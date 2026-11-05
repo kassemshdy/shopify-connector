@@ -1,0 +1,29 @@
+# Halyoon Connect's app configuration, for `shopify app deploy` (Shopify CLI).
+# It must match what the connector serves: the URLs below are its routes, and
+# the scopes are SHOPIFY_SCOPES (app/config.py). The client id is public; the
+# secret is never here (SHOPIFY_API_SECRET on Railway).
+client_id = "1de62c21f9761092dd8b18e12e3e3111"
+name = "Halyoon Connect"
+application_url = "https://connect.halyoon.com/"
+embedded = true
+
+[access_scopes]
+# Themes and files are only for the store profile (logo and social links);
+# write_themes also needs Shopify's per-app exemption.
+scopes = "read_products,write_products,read_publications,write_publications,read_themes,write_themes,write_files"
+
+[auth]
+redirect_urls = ["https://connect.halyoon.com/shopify/callback"]
+
+[webhooks]
+api_version = "2025-07"
+
+# Mandatory privacy webhooks. app/uninstalled and shop/update are subscribed
+# per store at connection (app/services/sync.py), so they are not repeated
+# here, which would deliver each one twice.
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "https://connect.halyoon.com/shopify/webhooks"
+
+[pos]
+embedded = false
