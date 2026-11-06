@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import Settings
 from app.crypto import decrypt
 from app.models import Job, Product, Store, SyncState
-from app.services import events
+from app.services import events, profile
 from app.shopify import ShopifyClient, ShopifyError, raise_user_errors
 
 logger = logging.getLogger(__name__)
@@ -200,6 +200,9 @@ def _handle(db: Session, job: Job, settings: Settings, http: httpx.Client) -> No
         product = db.get(Product, uuid.UUID(job.payload["product_id"]))
         if product is not None and product.store_id == store.id:
             push(db, product, client)
+    elif job.kind == profile.PROFILE:
+        profile.push_profile(store, client, job.payload)
+        events.emit(db, store.tenant_id, "store.updated", events.store_payload(store))
     elif job.kind == DELETE:
         result = client.graphql(
             PRODUCT_DELETE, {"input": {"id": job.payload["shopify_product_id"]}}
@@ -247,7 +250,8 @@ def drain_once(
                 store = db.get(Store, job.store_id)
                 if store is not None:
                     store.last_error = message
-                if job.attempts >= MAX_ATTEMPTS:
+                # Shopify's refusal of theme edits will not change on retry.
+                if job.attempts >= MAX_ATTEMPTS or isinstance(exc, profile.ThemeAccessDenied):
                     job.done_at = datetime.now(UTC)
                     _fail_product(db, job, message)
                 else:

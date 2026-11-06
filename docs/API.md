@@ -105,6 +105,28 @@ Request: `{"subdomain": "souk"}`
 - Errors: `422 bad_subdomain`, `422 reserved_subdomain`, `409 subdomain_taken`,
   `404 subdomains_off` (your site has no Cloudflare zone configured).
 
+### `PUT /v1/stores/{store_ref}/profile` → `202`
+
+Writes the shop's logo and social links into its store's live theme.
+
+```json
+{ "name": "Boutique Lilac",
+  "logo_url": "https://www.janoubona.net/media/.../logo.jpg",
+  "social": { "instagram": "https://instagram.com/...", "facebook": "https://facebook.com/..." } }
+```
+
+- **The logo** is uploaded to the store's Files: Shopify fetches it from `logo_url`, which must be a public https address.
+- **Social keys:** `facebook`, `instagram`, `tiktok`, `x`, `youtube`, `pinterest`, `snapchat`.
+- **Only settings the theme declares are written** (Dawn-family themes have them all). Nothing else in the theme changes, and an unchanged profile writes nothing.
+- **Horizon-family themes** keep the logo in the same place but the social links in a `social-links` block of `sections/footer-group.json`; every such block gets the links (`instagram_url`, ...). A link the shop did not give keeps the theme's value.
+- **Not covered:** the store's name and its homepage description. Shopify gives apps no way to set them.
+
+**Errors:**
+- `409 reconnect_required` means the store was connected before theme access was asked for. Connect it again.
+- `409 not_connected`: the store is not connected.
+
+**Shopify's exemption:** theme writes also need an exemption Shopify grants each app. Until it is granted, the job ends with *"Shopify has not yet allowed this app to edit themes"* in the store's `last_error`, and is not retried.
+
 ### `PUT /v1/stores/{store_ref}/products/{product_ref}` → `202`
 
 ```json
