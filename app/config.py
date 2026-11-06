@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # Remove once applied: it carries tenant keys in plaintext.
     bootstrap_tenants: str | None = None
 
+    # Shown on /support and /privacy; neither page names an address without it.
+    support_email: str | None = None
+
     # The operator page (/operator) is mounted only when this is set.
     operator_password: str | None = None
 
