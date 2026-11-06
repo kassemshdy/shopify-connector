@@ -28,7 +28,12 @@ class Settings(BaseSettings):
     shopify_api_key: str | None = None
     shopify_api_secret: str | None = None
     shopify_api_version: str = "2025-07"
-    shopify_scopes: str = "read_products,write_products,write_publications,read_publications"
+    # Themes and files: the store profile (logo, social links) written into the
+    # live theme. Theme writes also need Shopify's per-app exemption.
+    shopify_scopes: str = (
+        "read_products,write_products,write_publications,read_publications,"
+        "read_themes,write_themes,write_files"
+    )
 
     # JSON list of websites to create or update at startup (app/bootstrap.py).
     # Remove once applied: it carries tenant keys in plaintext.

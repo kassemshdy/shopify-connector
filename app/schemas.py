@@ -84,5 +84,15 @@ class ProductOut(BaseModel):
     synced_at: datetime | None
 
 
+class ProfileIn(BaseModel):
+    """What a website knows about the shop, for its store's theme."""
+
+    name: str | None = Field(default=None, max_length=255)
+    # A public https address Shopify can fetch the logo from.
+    logo_url: HttpUrl | None = None
+    # e.g. {"instagram": "https://instagram.com/...", "facebook": "..."}
+    social: dict[str, HttpUrl] = Field(default_factory=dict, max_length=12)
+
+
 class Queued(BaseModel):
     queued: int
