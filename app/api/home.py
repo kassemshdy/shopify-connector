@@ -140,7 +140,7 @@ def home(request: Request, db: DbSession, settings: AppSettings) -> HTMLResponse
 
 # PLACEHOLDER COPY: the two pages below are written to pass Shopify's review and
 # say only what the code does; the owners have not yet chosen their wording.
-_UPDATED = "5 November 2026"
+_UPDATED = "6 November 2026"
 
 
 def _contact(settings: AppSettings) -> str:
@@ -165,9 +165,11 @@ token Shopify issues at installation. The token is encrypted at rest.</li>
 <li>When the website asks for it, the shop's logo and social links, written into the
 store's theme.</li>
 </ul>
-<h2>What we do not store</h2>
-<p>No customer, order or payment data. The app requests no customer or order
-scopes, so Shopify never gives it any.</p>
+<h2>Orders and payments</h2>
+<p>The app is shared with Yalla Pay, our payment partner, which uses its order and
+inventory access to take payments and create the resulting orders in the store. That
+data is handled by Yalla Pay under its own policy. This service itself stores no
+customer, order or payment data.</p>
 <h2>Who processes it</h2>
 <p>The app runs on Railway; DNS for store addresses is managed on Cloudflare; error
 reports go to Sentry with personal data removed.</p>

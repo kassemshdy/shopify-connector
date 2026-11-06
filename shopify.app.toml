@@ -8,15 +8,16 @@ application_url = "https://connect.halyoon.com/"
 embedded = true
 
 [access_scopes]
-# Themes and files are only for the store profile (logo and social links);
-# write_themes also needs Shopify's per-app exemption.
-scopes = "read_products,write_products,read_publications,write_publications,read_themes,write_themes,write_files"
+# The app is shared with Yalla Pay. Ours: products, publications, and themes and
+# files for the store profile (write_themes also needs Shopify's exemption).
+# Yalla Pay's: inventory, locations, orders, draft orders, fulfilments.
+scopes = "read_products,write_products,read_publications,write_publications,read_themes,write_themes,write_files,read_inventory,read_locations,write_orders,write_draft_orders,read_fulfillments"
 
 [auth]
 redirect_urls = ["https://connect.halyoon.com/shopify/callback"]
 
 [webhooks]
-api_version = "2025-07"
+api_version = "2026-07"
 
 # Mandatory privacy webhooks. app/uninstalled and shop/update are subscribed
 # per store at connection (app/services/sync.py), so they are not repeated

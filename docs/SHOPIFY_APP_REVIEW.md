@@ -30,6 +30,27 @@ Two ways to fix it, to decide before submitting:
 
 Recommended: (a).
 
+## Sharing the app with Yalla Pay
+
+Halyoon Connect is one Shopify app used by two services (the owners' decision,
+6 Nov 2026): the connector (products, publications, the store profile) and Yalla
+Pay (inventory, orders, fulfilment). Both hold the same client ID and secret.
+What that requires:
+
+- **One owner of the configuration.** The scopes are the union of both lists.
+  The redirect URLs include both services' callbacks. Neither side runs
+  `shopify app deploy` with a file that drops the other's scopes or URLs.
+- **One secret, rotated together.** If either side rotates it, both update at
+  once: the connector's `SHOPIFY_API_SECRET` on Railway and Yalla Pay's copy.
+  Otherwise webhooks and the OAuth handshake fail for whoever is behind.
+- **Tokens:** check with Shopify's behaviour for this app that a token obtained by
+  one service does not invalidate the other's. Test it on Lilac before a second
+  store.
+- **Privacy webhooks:** the app has one URL for them (the connector's). The
+  connector should forward `customers/data_request` and `customers/redact` to
+  Yalla Pay, since Yalla Pay holds the order data. That is not built yet; it
+  needs Yalla Pay's endpoint.
+
 ## 2. Configuration (`shopify.app.toml`)
 
 The repository root holds the app's configuration: URLs, scopes and the
@@ -44,7 +65,7 @@ shopify app deploy             # releases a new app version from the file
 | Requirement | Where it is met |
 |---|---|
 | HMAC on every webhook | `app/api/shopify_routes.py` (`verify_webhook_hmac`); 401 otherwise |
-| `customers/data_request`, `customers/redact` | Acknowledged. No customer data is held, and no customer or order scope is requested. |
+| `customers/data_request`, `customers/redact` | The connector holds no customer data and acknowledges them. **Yalla Pay, which shares the app and reads orders, must also receive and act on them**; see "Sharing the app with Yalla Pay". |
 | `shop/redact` | Deletes the store row and its products, and releases its subdomain (`app/services/stores.py`). |
 | `app/uninstalled` | Clears the token at once. |
 | OAuth `state` and HMAC | Signed, expiring state; the return URL is allowlisted (`app/services/stores.py`). |
@@ -60,6 +81,8 @@ shopify app deploy             # releases a new app version from the file
 | `write_products`, `read_products` | Creates and updates the products the shop manages on its directory website. |
 | `write_publications`, `read_publications` | Publishes those products to the Online Store sales channel. |
 | `write_files` | Uploads the shop's logo to Files for the theme. |
+| `read_inventory`, `read_locations` | Yalla Pay: checks stock at the store's locations before taking a payment. |
+| `write_orders`, `write_draft_orders`, `read_fulfillments` | Yalla Pay: creates the order once the customer has paid, and follows its fulfilment. |
 | `read_themes`, `write_themes` | Sets the logo and social links in the live theme's settings (`config/settings_data.json`, and Horizon's footer `social-links` block). Only these settings are changed. |
 
 Theme-file exemption request text (PLACEHOLDER):
