@@ -19,12 +19,14 @@ from app.schemas import (
     ProductOut,
     ProfileIn,
     Queued,
+    SetupIn,
     StoreOut,
     SubdomainIn,
     TenantOut,
 )
 from app.services import products as product_service
 from app.services import profile as profile_service
+from app.services import setup as setup_service
 from app.services.stores import StoreService, check_page_url, get_store
 from app.services.sync import enqueue
 
@@ -59,6 +61,7 @@ def store_out(db: DbSession, tenant: Tenant, store: Store) -> StoreOut:
         last_sync_at=store.last_sync_at,
         last_error=store.last_error,
         products_synced=synced,
+        setup=store.setup_report,
         jobs_pending=pending,
         signup_url=tenant.signup_url,
     )
@@ -116,6 +119,23 @@ def disconnect(
 ) -> Response:
     StoreService(db, settings, http).disconnect(tenant, get_store(db, tenant, store_ref))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put(
+    "/stores/{store_ref}/setup", response_model=Queued, status_code=status.HTTP_202_ACCEPTED
+)
+def put_setup(store_ref: Ref, payload: SetupIn, tenant: CurrentTenant, db: DbSession) -> Queued:
+    """Queue the store setup: the country in an active market, and a delivery rate there.
+
+    Missing scopes are not refused here: the job reads what the store has really
+    granted (an approval inside Shopify never reaches us) and reports them.
+    """
+    store = get_store(db, tenant, store_ref)
+    if not store.is_live:
+        raise Conflict("not_connected", "The store is not connected.")
+    enqueue(db, store, setup_service.SETUP, payload.model_dump(mode="json"))
+    db.commit()
+    return Queued(queued=1)
 
 
 @router.put("/stores/{store_ref}/page", response_model=StoreOut)

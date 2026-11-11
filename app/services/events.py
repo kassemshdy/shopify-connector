@@ -38,6 +38,7 @@ def store_payload(store: Store) -> dict[str, Any]:
         "subdomain_hostname": f"{store.subdomain}.{base}" if store.subdomain and base else None,
         "currency": store.currency,
         "last_error": store.last_error,
+        "setup": store.setup_report,
     }
 
 

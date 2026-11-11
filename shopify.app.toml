@@ -3,15 +3,16 @@
 # the scopes are SHOPIFY_SCOPES (app/config.py). The client id is public; the
 # secret is never here (SHOPIFY_API_SECRET on Railway).
 client_id = "1de62c21f9761092dd8b18e12e3e3111"
-name = "Halyoon Connect"
+name = "YallaPay Connect"
 application_url = "https://connect.halyoon.com/"
 embedded = true
 
 [access_scopes]
 # The app is shared with Yalla Pay. Ours: products, publications, and themes and
 # files for the store profile (write_themes also needs Shopify's exemption).
-# Yalla Pay's: inventory, locations, orders, draft orders, fulfilments.
-scopes = "read_products,write_products,read_publications,write_publications,read_themes,write_themes,write_files,read_inventory,read_locations,write_orders,write_draft_orders,read_fulfillments"
+# Yalla Pay's: inventory, locations, orders, draft orders, fulfilments, listings.
+# Markets and shipping: the store setup (a market and a delivery rate).
+scopes = "read_products,write_products,read_publications,write_publications,read_themes,write_themes,write_files,read_markets,write_markets,read_shipping,write_shipping,read_inventory,read_locations,write_orders,write_draft_orders,read_fulfillments,unauthenticated_read_product_listings"
 
 [auth]
 redirect_urls = ["https://connect.halyoon.com/shopify/callback"]

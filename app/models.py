@@ -100,6 +100,8 @@ class Store(Base, Timestamps):
     subdomain: Mapped[str | None] = mapped_column(String(63), nullable=True)
     # The shop's own page on the website, linked from the app page in Shopify.
     page_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # What the last store setup did (market, delivery rate), for the website to show.
+    setup_report: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     cf_record_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

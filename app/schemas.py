@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -15,6 +16,20 @@ class ConnectIn(BaseModel):
 
 class PageIn(BaseModel):
     page_url: HttpUrl
+
+
+class RateIn(BaseModel):
+    name: str = Field(default="Standard Delivery", min_length=1, max_length=60)
+    price: Decimal = Field(ge=0, le=10000, decimal_places=2)
+    description: str | None = Field(default=None, max_length=120)
+
+
+class SetupIn(BaseModel):
+    """Put a country in an active market and give it a delivery rate."""
+
+    country: str = Field(default="LB", pattern="^[A-Z]{2}$")
+    currency: str = Field(default="USD", pattern="^[A-Z]{3}$")
+    rate: RateIn
 
 
 class ConnectOut(BaseModel):
@@ -47,6 +62,7 @@ class StoreOut(BaseModel):
     last_error: str | None
     products_synced: int
     jobs_pending: int
+    setup: dict[str, Any] | None = None
     signup_url: str | None
 
 

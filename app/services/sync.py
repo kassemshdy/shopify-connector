@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import Settings
 from app.crypto import decrypt
 from app.models import Job, Product, Store, SyncState
-from app.services import events, profile
+from app.services import events, profile, setup
 from app.shopify import ShopifyClient, ShopifyError, raise_user_errors
 
 logger = logging.getLogger(__name__)
@@ -202,6 +202,9 @@ def _handle(db: Session, job: Job, settings: Settings, http: httpx.Client) -> No
             push(db, product, client)
     elif job.kind == profile.PROFILE:
         profile.push_profile(store, client, job.payload)
+        events.emit(db, store.tenant_id, "store.updated", events.store_payload(store))
+    elif job.kind == setup.SETUP:
+        store.setup_report = setup.run_setup(store, client, job.payload)
         events.emit(db, store.tenant_id, "store.updated", events.store_payload(store))
     elif job.kind == DELETE:
         result = client.graphql(
