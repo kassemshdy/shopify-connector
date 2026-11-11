@@ -14,6 +14,7 @@ from app.schemas import (
     BulkIn,
     ConnectIn,
     ConnectOut,
+    PageIn,
     ProductIn,
     ProductOut,
     ProfileIn,
@@ -24,7 +25,7 @@ from app.schemas import (
 )
 from app.services import products as product_service
 from app.services import profile as profile_service
-from app.services.stores import StoreService, get_store
+from app.services.stores import StoreService, check_page_url, get_store
 from app.services.sync import enqueue
 
 router = APIRouter(prefix="/v1", tags=["v1"])
@@ -96,7 +97,8 @@ def connect(
     settings: ShopifySettings, http: Http,
 ) -> ConnectOut:
     url = StoreService(db, settings, http).start_connect(
-        tenant, store_ref, payload.shop, str(payload.return_url)
+        tenant, store_ref, payload.shop, str(payload.return_url),
+        str(payload.page_url) if payload.page_url else None,
     )
     return ConnectOut(authorize_url=url)
 
@@ -114,6 +116,16 @@ def disconnect(
 ) -> Response:
     StoreService(db, settings, http).disconnect(tenant, get_store(db, tenant, store_ref))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/stores/{store_ref}/page", response_model=StoreOut)
+def put_page(store_ref: Ref, payload: PageIn, tenant: CurrentTenant, db: DbSession) -> StoreOut:
+    """Record the shop's own page on the website, linked from the app page in Shopify."""
+    store = get_store(db, tenant, store_ref)
+    check_page_url(tenant, str(payload.page_url))
+    store.page_url = str(payload.page_url)
+    db.commit()
+    return store_out(db, tenant, store)
 
 
 @router.post("/stores/{store_ref}/subdomain", response_model=StoreOut)

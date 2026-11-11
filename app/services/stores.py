@@ -49,6 +49,12 @@ def _origin(url: str) -> str:
     return f"{parts.scheme}://{parts.netloc}".rstrip("/")
 
 
+def check_page_url(tenant: Tenant, page_url: str) -> None:
+    """A shop's page must be on the website itself: it is linked inside Shopify."""
+    if _origin(page_url) not in tenant.origins:
+        raise Invalid("bad_page_url", "page_url is not on this tenant's allow-list.")
+
+
 def with_status(return_url: str, status: str) -> str:
     joiner = "&" if "?" in return_url else "?"
     return f"{return_url}{joiner}{urlencode({'shopify': status})}"
@@ -71,12 +77,17 @@ class StoreService:
 
     # --- connect ------------------------------------------------------------
 
-    def start_connect(self, tenant: Tenant, ref: str, shop_input: str, return_url: str) -> str:
+    def start_connect(
+        self, tenant: Tenant, ref: str, shop_input: str, return_url: str,
+        page_url: str | None = None,
+    ) -> str:
         shop = shopify.normalize_shop(shop_input)
         if not shopify.is_shop_domain(shop):
             raise Invalid("bad_shop", "Expected a <name>.myshopify.com store address.")
         if _origin(return_url) not in tenant.origins:
             raise Invalid("bad_return_url", "return_url is not on this tenant's allow-list.")
+        if page_url is not None:
+            check_page_url(tenant, page_url)
         now = datetime.now(UTC)
         state = jwt.encode(
             {
@@ -96,8 +107,11 @@ class StoreService:
             select(Store).where(Store.tenant_id == tenant.id, Store.external_ref == ref)
         ).first()
         if store is None:
-            self.db.add(Store(tenant_id=tenant.id, external_ref=ref, status=StoreStatus.PENDING))
-            self.db.commit()
+            store = Store(tenant_id=tenant.id, external_ref=ref, status=StoreStatus.PENDING)
+            self.db.add(store)
+        if page_url is not None:
+            store.page_url = page_url
+        self.db.commit()
         assert self.settings.shopify_api_key
         return shopify.authorize_url(
             shop,

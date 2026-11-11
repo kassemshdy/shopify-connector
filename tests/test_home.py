@@ -63,3 +63,35 @@ def test_the_privacy_and_support_pages_are_public_and_name_the_contact_when_set(
         assert "frame-ancestors 'none'" in page.headers["content-security-policy"]
         assert "mailto:" not in page.text
     assert "customer" in client.get("/privacy").text
+
+
+def test_the_button_opens_the_shops_own_page_once_the_website_gives_it(
+    client: TestClient, db: Session, settings: Settings
+) -> None:
+    from tests.conftest import auth
+
+    _, key, _ = make_tenant(db, settings, "site")
+    connect(client, key, "site")
+    page_url = "https://site.tenant.test/business/lilac"
+    r = client.put("/v1/stores/shop-1/page", headers=auth(key), json={"page_url": page_url})
+    assert r.status_code == 200, r.text
+    page = client.get("/", params=launch())
+    assert f'href="{page_url}"' in page.text and "Open your page on Site" in page.text
+
+
+def test_a_page_off_the_website_is_refused(
+    client: TestClient, db: Session, settings: Settings
+) -> None:
+    from tests.conftest import auth
+
+    _, key, _ = make_tenant(db, settings, "site")
+    connect(client, key, "site")
+    r = client.put("/v1/stores/shop-1/page", headers=auth(key),
+                   json={"page_url": "https://evil.test/phish"})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "bad_page_url"
+    started = client.post(
+        "/v1/stores/shop-2/connect", headers=auth(key),
+        json={"shop": "other.myshopify.com", "return_url": "https://site.tenant.test/x",
+              "page_url": "https://evil.test/phish"},
+    )
+    assert started.status_code == 422

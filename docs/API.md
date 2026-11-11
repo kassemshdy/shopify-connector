@@ -58,12 +58,15 @@ Your own settings. Use them to decide what to show before a shop connects.
 
 ### `POST /v1/stores/{store_ref}/connect`
 
-Request: `{"shop": "souk" | "souk.myshopify.com", "return_url": "https://your-site/..."}`
+Request: `{"shop": "souk" | "souk.myshopify.com", "return_url": "https://your-site/...", "page_url": "https://your-site/business/souk"}`
 
 Response: `{"authorize_url": "https://souk.myshopify.com/admin/oauth/authorize?..."}`
 
 - `return_url` must be on your site's allow-list (the origins you registered).
-- Errors: `422 bad_shop`, `422 bad_return_url`.
+- `page_url` (optional) is the shop's own page on your site. The app page in the
+  store's Shopify admin links to it ("Open your page on ..."); without it, the
+  link goes to your site's home page. It must be on your allow-list too.
+- Errors: `422 bad_shop`, `422 bad_return_url`, `422 bad_page_url`.
 
 ### `GET /v1/stores/{store_ref}`
 
@@ -93,6 +96,14 @@ offers no way to create stores automatically.
 
 Revokes the app's access and removes the store's DNS record. Products already
 in the Shopify store stay; they are the owner's.
+
+### `PUT /v1/stores/{store_ref}/page`
+
+Request: `{"page_url": "https://your-site/business/souk"}`. Response: the store, as `GET`.
+
+Sets or changes the shop's page linked from the app page in Shopify, for a store
+connected before you sent `page_url`, or after the shop's address changes.
+Errors: `404 store_not_found`, `422 bad_page_url`.
 
 ### `POST /v1/stores/{store_ref}/subdomain`
 
