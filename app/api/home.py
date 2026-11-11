@@ -130,7 +130,13 @@ def home(request: Request, db: DbSession, settings: AppSettings) -> HTMLResponse
     )
     if store.last_error:
         body += f'<p class="error">Last problem: {escape(store.last_error)}</p>'
-    if tenant.origins:
+    # The shop's own page when the website told us it, else the website itself.
+    if store.page_url:
+        body += (
+            f'<a class="button" href="{escape(store.page_url)}" target="_top" '
+            f'rel="noopener">Open your page on {escape(tenant.name)}</a>'
+        )
+    elif tenant.origins:
         body += (
             f'<a class="button" href="{escape(tenant.origins[0])}" target="_top" '
             f'rel="noopener">Open {escape(tenant.name)}</a>'

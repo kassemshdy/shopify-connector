@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field, HttpUrl
 class ConnectIn(BaseModel):
     shop: str = Field(min_length=1, max_length=255)
     return_url: HttpUrl
+    # The shop's own page on the website; must be on the tenant's origins.
+    page_url: HttpUrl | None = None
+
+
+class PageIn(BaseModel):
+    page_url: HttpUrl
 
 
 class ConnectOut(BaseModel):

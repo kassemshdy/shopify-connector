@@ -98,6 +98,8 @@ class Store(Base, Timestamps):
     primary_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     subdomain: Mapped[str | None] = mapped_column(String(63), nullable=True)
+    # The shop's own page on the website, linked from the app page in Shopify.
+    page_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     cf_record_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
