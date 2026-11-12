@@ -97,6 +97,26 @@ offers no way to create stores automatically.
 Revokes the app's access and removes the store's DNS record. Products already
 in the Shopify store stay; they are the owner's.
 
+### `PUT /v1/stores/{store_ref}/setup` → `202`
+
+Request:
+`{"country": "LB", "currency": "USD", "rate": {"name": "Standard Delivery", "price": "4.00", "description": "2-3 business days"}}`
+(`country` and `currency` default to `LB` and `USD`).
+
+Queues a job that **only adds what is missing**:
+- the country goes into an active market priced in `currency`, unless a market
+  already includes it, which is then left as it is;
+- the default delivery profile gets the rate for that country, in the zone already
+  covering it (a method with the same name is updated, never duplicated) or in a
+  new zone named after the country.
+
+Nothing the merchant set up is deleted or renamed. The result is the store's
+`setup` (in `GET` and in `store.updated`): `ok`, `store_currency`/`currency_ok`
+(an app cannot change the store currency), `market`, `rate`, and
+`missing_scopes` when the store has not granted `write_markets`/`write_shipping`.
+The granted scopes are read from Shopify itself, since an approval made inside
+Shopify never reaches the connector. Errors: `409 not_connected`.
+
 ### `PUT /v1/stores/{store_ref}/page`
 
 Request: `{"page_url": "https://your-site/business/souk"}`. Response: the store, as `GET`.

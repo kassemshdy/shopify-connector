@@ -30,9 +30,14 @@ class Settings(BaseSettings):
     shopify_api_version: str = "2025-07"
     # Themes and files: the store profile (logo, social links) written into the
     # live theme. Theme writes also need Shopify's per-app exemption.
+    # The app is shared with Yalla Pay (inventory, locations, orders, product
+    # listings); markets and shipping are for the store setup. Must match the
+    # app version's scopes in the Dev Dashboard (shopify.app.toml).
     shopify_scopes: str = (
         "read_products,write_products,write_publications,read_publications,"
-        "read_themes,write_themes,write_files"
+        "read_themes,write_themes,write_files,read_markets,write_markets,"
+        "read_shipping,write_shipping,read_inventory,read_locations,write_orders,"
+        "write_draft_orders,read_fulfillments,unauthenticated_read_product_listings"
     )
 
     # JSON list of websites to create or update at startup (app/bootstrap.py).
