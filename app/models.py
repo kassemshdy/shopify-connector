@@ -9,6 +9,9 @@
   in Shopify. ``external_ref`` is the tenant's product id.
 - ``Job``: a push to Shopify waiting to be sent.
 - ``WebhookDelivery``: an event waiting to be delivered to a tenant.
+- ``Installation``: a store that installed the app from Shopify (managed
+  install) before any website linked it; its token waits here until a
+  tenant connects that store.
 
 Every query a tenant can trigger is scoped by ``tenant_id``.
 """
@@ -183,3 +186,15 @@ class WebhookDelivery(Base, Timestamps):
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     gave_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(Text)
+
+
+class Installation(Base, Timestamps):
+    """The app installed on a store from Shopify, holding its token until a website links it."""
+
+    __tablename__ = "installations"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    shop_domain: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    access_token_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scopes: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

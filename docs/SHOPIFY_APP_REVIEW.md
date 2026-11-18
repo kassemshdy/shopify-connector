@@ -7,49 +7,21 @@ works without any of this.
 
 Everything marked **PLACEHOLDER** is wording for the owners to choose.
 
-## 1. Blocker to fix before submitting: install must start the connection
+## 1. Install starts the connection (done)
 
-Reviewers install the app from its listing. Shopify requires an app to
-**authenticate straight after install**: the install lands on the App URL,
-and the app must go to the grant screen before showing anything else. Today a
-store connects only from the website (`POST /v1/stores/{ref}/connect`). A store
-installing from the listing therefore sees «Not connected yet» on
-`GET /`, which fails the review.
+Reviewers install the app from its listing or install link. The connector
+now completes that install itself: Shopify opens the app page with a signed
+session token (`id_token`), the connector checks it and swaps it for the
+store's offline token (token exchange), and keeps it as an **installation**.
+The page says the app is installed. When the website then connects that
+store (`POST /v1/stores/{ref}/connect`), the installation is linked at once:
+no second grant screen. Uninstalling before any website linked the store
+deletes the token.
 
-Two ways to fix it, to decide before submitting:
-
-- **(a) Install from Shopify, link to a website afterwards.** A signed launch
-  from a store with no token is redirected to the grant screen. The store is
-  saved with no website yet, and an administrator links it from the website's
-  `/admin/shopify` page. This is a schema change, because a store currently
-  always belongs to a tenant.
-- **(b) Unlisted listing plus a reviewer website account.** The flow stays
-  website-first. The reviewer gets an account on the develop site and
-  connects from there (section 4). This is weaker: reviewers have rejected
-  apps whose install does not start the connection.
-
-Recommended: (a).
-
-## Sharing the app with Yalla Pay
-
-Halyoon Connect is one Shopify app used by two services (the owners' decision,
-6 Nov 2026): the connector (products, publications, the store profile) and Yalla
-Pay (inventory, orders, fulfilment). Both hold the same client ID and secret.
-What that requires:
-
-- **One owner of the configuration.** The scopes are the union of both lists.
-  The redirect URLs include both services' callbacks. Neither side runs
-  `shopify app deploy` with a file that drops the other's scopes or URLs.
-- **One secret, rotated together.** If either side rotates it, both update at
-  once: the connector's `SHOPIFY_API_SECRET` on Railway and Yalla Pay's copy.
-  Otherwise webhooks and the OAuth handshake fail for whoever is behind.
-- **Tokens:** check with Shopify's behaviour for this app that a token obtained by
-  one service does not invalidate the other's. Test it on Lilac before a second
-  store.
-- **Privacy webhooks:** the app has one URL for them (the connector's). The
-  connector should forward `customers/data_request` and `customers/redact` to
-  Yalla Pay, since Yalla Pay holds the order data. That is not built yet; it
-  needs Yalla Pay's endpoint.
+For the public app, set `use_legacy_install_flow = false` (Shopify-managed
+install) so the scopes are granted at install. While stores move from the
+earlier custom app, put its secret in `SHOPIFY_EXTRA_SECRETS` so its webhooks
+and launches are still verified.
 
 ## 2. Configuration (`shopify.app.toml`)
 

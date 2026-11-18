@@ -32,7 +32,7 @@ from app.cloudflare import RESERVED, SUBDOMAIN, CloudflareDns, CloudflareError
 from app.config import Settings
 from app.crypto import decrypt, encrypt
 from app.errors import Conflict, Invalid, NotFound
-from app.models import Product, Store, StoreStatus, Tenant
+from app.models import Installation, Product, Store, StoreStatus, Tenant
 from app.services import events
 from app.services.sync import client_for, refresh_shop, register_webhooks
 
@@ -112,6 +112,15 @@ class StoreService:
         if page_url is not None:
             store.page_url = page_url
         self.db.commit()
+        # Installed from Shopify already (the App Store, an install link): link it
+        # now, with the token Shopify gave at install, and skip the grant screen.
+        installed = self.db.scalars(
+            select(Installation).where(
+                Installation.shop_domain == shop, Installation.access_token_enc.is_not(None)
+            )
+        ).first()
+        if installed is not None:
+            return self._link_installation(tenant, store, installed, return_url)
         assert self.settings.shopify_api_key
         return shopify.authorize_url(
             shop,
@@ -120,6 +129,65 @@ class StoreService:
             redirect_uri=self.settings.public_base_url.rstrip("/") + CALLBACK_PATH,
             state=state,
         )
+
+    def install_from_launch(self, shop: str, session_token: str) -> Installation:
+        """Keep the token of a store that installed the app from Shopify (token exchange)."""
+        assert self.settings.shopify_api_key and self.settings.shopify_api_secret
+        token, scopes = shopify.token_exchange(
+            self.http, shop,
+            api_key=self.settings.shopify_api_key,
+            api_secret=self.settings.shopify_api_secret,
+            session_token=session_token,
+        )
+        installed = self.db.scalars(
+            select(Installation).where(Installation.shop_domain == shop)
+        ).first()
+        if installed is None:
+            installed = Installation(shop_domain=shop)
+            self.db.add(installed)
+        installed.access_token_enc = encrypt(self.settings, token)
+        installed.scopes = scopes
+        installed.claimed_at = None
+        store = self.db.scalars(select(Store).where(Store.shop_domain == shop)).first()
+        if store is not None:
+            # A store a website already linked, reinstalled: it is live again.
+            store.access_token_enc = installed.access_token_enc
+            store.scopes = scopes
+            store.status = StoreStatus.CONNECTED
+            store.last_error = None
+            installed.claimed_at = datetime.now(UTC)
+            events.emit(self.db, store.tenant_id, "store.updated", events.store_payload(store))
+        self.db.commit()
+        logger.info("App installed from Shopify", extra={"shop": shop})
+        return installed
+
+    def _link_installation(
+        self, tenant: Tenant, store: Store, installed: Installation, return_url: str
+    ) -> str:
+        taken = self.db.scalars(
+            select(Store).where(Store.shop_domain == installed.shop_domain, Store.id != store.id)
+        ).first()
+        if taken is not None:
+            return with_status(return_url, "shop_taken")
+        store.shop_domain = installed.shop_domain
+        store.access_token_enc = installed.access_token_enc
+        store.scopes = installed.scopes
+        store.status = StoreStatus.CONNECTED
+        store.connected_at = datetime.now(UTC)
+        store.last_error = None
+        installed.claimed_at = datetime.now(UTC)
+        try:
+            client = client_for(store, self.settings, self.http)
+            refresh_shop(store, client)
+            register_webhooks(client, self.settings.public_base_url.rstrip("/") + WEBHOOK_PATH)
+        except shopify.ShopifyError as exc:
+            store.last_error = str(exc)
+        events.emit(self.db, tenant.id, "store.connected", events.store_payload(store))
+        self.db.commit()
+        logger.info(
+            "Installed store linked", extra={"store_id": str(store.id), "tenant": tenant.slug}
+        )
+        return with_status(return_url, "connected")
 
     def read_state(self, state: str) -> dict[str, Any]:
         try:
@@ -240,8 +308,15 @@ class StoreService:
         store.subdomain = None
 
     def handle_shopify_webhook(self, topic: str, shop: str) -> None:
+        if topic in ("app/uninstalled", "shop/redact"):
+            installed = self.db.scalars(
+                select(Installation).where(Installation.shop_domain == shop)
+            ).first()
+            if installed is not None:
+                self.db.delete(installed)
         store = self.db.scalars(select(Store).where(Store.shop_domain == shop)).first()
         if store is None:
+            self.db.commit()
             return
         tenant = store.tenant
         if topic == "app/uninstalled":
