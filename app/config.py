@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     shopify_api_key: str | None = None
     shopify_api_secret: str | None = None
     shopify_api_version: str = "2025-07"
+    # Secrets of other apps whose installs this connector still serves (e.g. the
+    # earlier custom app while stores move to the public one), comma-separated.
+    # Only used to verify what Shopify sends; tokens are per store.
+    shopify_extra_secrets: str | None = None
     # Themes and files: the store profile (logo, social links) written into the
     # live theme. Theme writes also need Shopify's per-app exemption.
     # The app is shared with Yalla Pay (inventory, locations, orders, product
@@ -60,6 +64,11 @@ class Settings(BaseSettings):
     @property
     def shopify_enabled(self) -> bool:
         return bool(self.shopify_api_key and self.shopify_api_secret and self.encryption_key)
+
+    def shopify_secrets(self) -> list[str]:
+        """Every app secret Shopify may sign with: the current app's first."""
+        extra = [x.strip() for x in (self.shopify_extra_secrets or "").split(",") if x.strip()]
+        return [s for s in [self.shopify_api_secret, *extra] if s]
 
     def enforce_production_safety(self) -> None:
         if self.app_env != "production":

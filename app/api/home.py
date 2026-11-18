@@ -10,6 +10,7 @@ of the app, with nothing about any store.
 
 from __future__ import annotations
 
+import logging
 import time
 from html import escape
 
@@ -17,11 +18,14 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 
-from app.api.deps import AppSettings, DbSession
-from app.models import Product, Store, StoreStatus, SyncState
+from app import shopify
+from app.api.deps import AppSettings, DbSession, Http
+from app.models import Installation, Product, Store, StoreStatus, SyncState
+from app.services.stores import StoreService
 from app.shopify import is_shop_domain, verify_query_hmac
 
 router = APIRouter(include_in_schema=False)
+logger = logging.getLogger(__name__)
 
 # Shopify signs the launch with the current time; an older link is refused so a
 # copied URL does not keep showing a store's status.
@@ -76,18 +80,16 @@ def _generic(name: str) -> str:
 
 
 @router.get("/")
-def home(request: Request, db: DbSession, settings: AppSettings) -> HTMLResponse:
+def home(request: Request, db: DbSession, settings: AppSettings, http: Http) -> HTMLResponse:
     params = dict(request.query_params)
     shop = params.get("shop", "")
-    secret = settings.shopify_api_secret
     try:
         age = abs(time.time() - int(params.get("timestamp", "0")))
     except ValueError:
         age = float("inf")
     launched = bool(
-        secret
-        and is_shop_domain(shop)
-        and verify_query_hmac(params, secret)
+        is_shop_domain(shop)
+        and any(verify_query_hmac(params, s) for s in settings.shopify_secrets())
         and age <= LAUNCH_MAX_AGE_SECONDS
     )
     if not launched:
@@ -95,6 +97,36 @@ def home(request: Request, db: DbSession, settings: AppSettings) -> HTMLResponse
 
     frame = f"https://{shop} https://admin.shopify.com"
     store = db.scalars(select(Store).where(Store.shop_domain == shop)).first()
+    if store is None or store.status is not StoreStatus.CONNECTED:
+        # Installed from Shopify (managed install): keep the store's token now,
+        # from the session token Shopify passes, so no grant screen is needed.
+        session_token = params.get("id_token", "")
+        if (
+            session_token
+            and settings.shopify_api_key
+            and shopify.verify_session_token(
+                session_token, settings.shopify_api_key, settings.shopify_secrets()
+            ) == shop
+        ):
+            try:
+                StoreService(db, settings, http).install_from_launch(shop, session_token)
+                store = db.scalars(select(Store).where(Store.shop_domain == shop)).first()
+            except shopify.ShopifyError:
+                logger.warning("Token exchange failed", extra={"shop": shop})
+    if store is None:
+        installed = db.scalars(
+            select(Installation).where(Installation.shop_domain == shop)
+        ).first()
+        if installed is not None and installed.access_token_enc:
+            body = (
+                "<h1>Installed</h1>"
+                f"<p>{escape(settings.app_name)} is installed on {escape(shop)}. The website "
+                "where your shop is listed will now link this store, and your products will "
+                "appear here once it does. There is nothing else to do.</p>"
+            )
+            return _response(
+                _page(body, settings.app_name, api_key=settings.shopify_api_key), frame
+            )
     if store is None or store.status is not StoreStatus.CONNECTED:
         body = (
             "<h1>Not connected yet</h1>"

@@ -9,9 +9,10 @@ import re
 import time
 from collections.abc import Mapping
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import httpx
+import jwt
 
 SHOP_DOMAIN = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
 MAX_RETRIES = 4
@@ -64,6 +65,42 @@ def exchange_code(
     response = http.post(
         f"https://{shop}/admin/oauth/access_token",
         json={"client_id": api_key, "client_secret": api_secret, "code": code},
+    )
+    if response.status_code != 200:
+        raise ShopifyError(f"token exchange failed ({response.status_code})")
+    data = response.json()
+    return str(data["access_token"]), str(data.get("scope", ""))
+
+
+def verify_session_token(token: str, api_key: str, secrets: list[str]) -> str | None:
+    """The shop a Shopify session token (an App Bridge id_token) was issued for, if valid."""
+    for secret in secrets:
+        try:
+            claims = jwt.decode(
+                token, secret, algorithms=["HS256"], audience=api_key, leeway=10,
+                options={"require": ["exp", "dest", "aud"]},
+            )
+        except jwt.PyJWTError:
+            continue
+        shop = urlsplit(str(claims.get("dest", ""))).hostname or ""
+        return shop if is_shop_domain(shop) else None
+    return None
+
+
+def token_exchange(
+    http: httpx.Client, shop: str, *, api_key: str, api_secret: str, session_token: str
+) -> tuple[str, str]:
+    """Swap a session token for the store's offline access token (managed install)."""
+    response = http.post(
+        f"https://{shop}/admin/oauth/access_token",
+        json={
+            "client_id": api_key,
+            "client_secret": api_secret,
+            "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+            "subject_token": session_token,
+            "subject_token_type": "urn:ietf:params:oauth:token-type:id_token",
+            "requested_token_type": "urn:shopify:params:oauth:token-type:offline-access-token",
+        },
     )
     if response.status_code != 200:
         raise ShopifyError(f"token exchange failed ({response.status_code})")

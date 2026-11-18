@@ -37,10 +37,8 @@ async def webhooks(
     request: Request, db: DbSession, settings: ShopifySettings, http: Http
 ) -> Response:
     body = await request.body()
-    assert settings.shopify_api_secret
-    if not verify_webhook_hmac(
-        body, request.headers.get("X-Shopify-Hmac-Sha256"), settings.shopify_api_secret
-    ):
+    header = request.headers.get("X-Shopify-Hmac-Sha256")
+    if not any(verify_webhook_hmac(body, header, s) for s in settings.shopify_secrets()):
         return Response(status_code=401)
     await run_in_threadpool(
         StoreService(db, settings, http).handle_shopify_webhook,

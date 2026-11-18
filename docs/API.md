@@ -63,6 +63,9 @@ Request: `{"shop": "souk" | "souk.myshopify.com", "return_url": "https://your-si
 Response: `{"authorize_url": "https://souk.myshopify.com/admin/oauth/authorize?..."}`
 
 - `return_url` must be on your site's allow-list (the origins you registered).
+- If the store already installed the app from Shopify (an install link or the
+  App Store), it is linked at once and `authorize_url` is simply your
+  `return_url` with `?shopify=connected`: there is no Shopify screen to show.
 - `page_url` (optional) is the shop's own page on your site. The app page in the
   store's Shopify admin links to it ("Open your page on ..."); without it, the
   link goes to your site's home page. It must be on your allow-list too.
