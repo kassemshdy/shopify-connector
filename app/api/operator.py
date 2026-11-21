@@ -153,6 +153,8 @@ header button { background: transparent; border: 1px solid #fff; }
 .ok { color: #007f5f; } .bad { color: #d82c0d; } .muted { color: #6d7175; }
 .secret { background: #fff4e4; border: 1px solid #ffc453; border-radius: 10px; padding: 14px 16px; }
 code { background: #f1f2f3; padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+table.apps td { vertical-align: middle; }
+table.apps td:last-child:not([colspan]) { text-align: right; }
 .error { background: #fff4f4; border: 1px solid #fead9a; border-radius: 10px; padding: 10px 14px; }
 """
 
@@ -610,15 +612,24 @@ def _apps_page(db: Session, op: Operator, *, form: dict[str, str] | None = None,
 <section><p class="muted">A store listed here is installed, connected and checked with its own
 app (custom distribution). Every other store uses the default app
 (<code>SHOPIFY_API_KEY</code>). The secret is stored encrypted and never shown again.</p>
-<table><tr><th>Store</th><th>App name</th><th>Client id</th><th>Added</th><th></th></tr>
+<table class="apps"><tr><th>Store</th><th>App name</th><th>Client id</th><th>Added</th>
+<th></th></tr>
 {rows}</table></section>
 <section><h2>Add a store's app</h2>{err}
 <form method="post" action="/operator/apps">{_hidden(op)}
-<label>Store address<input name="shop" value="{v["shop"]}"
- placeholder="name.myshopify.com" required></label>
-<label>App name<input name="name" value="{v["name"]}" placeholder="Janoubona - Shop name"></label>
-<label>Client id<input name="client_id" value="{v["client_id"]}" required></label>
-<label>Client secret<input name="secret" type="password" autocomplete="off" required></label>
+<label for="shop">Store address</label>
+<input type="text" id="shop" name="shop" value="{v["shop"]}"
+ placeholder="name.myshopify.com" required>
+<p class="hint">The store's current <code>*.myshopify.com</code> address, as in its admin.</p>
+<label for="name">App name</label>
+<input type="text" id="name" name="name" value="{v["name"]}" placeholder="Janoubona - Shop name">
+<label for="client_id">Client id</label>
+<input type="text" id="client_id" name="client_id" value="{v["client_id"]}" required
+ autocomplete="off" spellcheck="false">
+<p class="hint">From the store's own app: Dev Dashboard → the app → Settings.
+Not the default app's.</p>
+<label for="secret">Client secret</label>
+<input type="password" id="secret" name="secret" autocomplete="off" required>
 <div class="row"><button>Add app</button></div></form></section>""", op)
 
 

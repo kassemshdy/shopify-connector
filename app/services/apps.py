@@ -53,6 +53,10 @@ def add(db: Session, settings: Settings, *, shop: str, client_id: str, secret: s
         raise Invalid("bad_shop", "Expected a <name>.myshopify.com store address.")
     if not client_id or not secret:
         raise Invalid("bad_app", "Both the client id and the secret are needed.")
+    if client_id == settings.shopify_api_key:
+        raise Invalid("default_app", "This is the default app's client id. Use the client "
+                                     "id of the store's own app (Dev Dashboard → the app → "
+                                     "Settings).")
     taken = db.scalars(select(ShopifyApp).where(
         (ShopifyApp.shop_domain == shop) | (ShopifyApp.client_id == client_id)
     )).first()
