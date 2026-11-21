@@ -33,12 +33,28 @@ async def run_worker(settings: Settings) -> None:
                     logger.exception("Worker step failed")
 
 
+class DropQueryString(logging.Filter):
+    """Log uvicorn's access line with the path only, never the query string."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn's access record: (client, method, full_path, http_version, status).
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            record.args = (*args[:2], args[2].split("?", 1)[0], *args[3:])
+        return True
+
+
 def create_app(settings: Settings | None = None, *, worker: bool = True) -> FastAPI:
     settings = settings or get_settings()
     logging.basicConfig(level=settings.log_level)
     # httpx logs every URL it calls; keep it quiet so no request detail lands
     # in the deployment logs.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    # Shopify opens the app page with a session token, an hmac and the shop in
+    # the query string; uvicorn's access line would keep them in the logs.
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, DropQueryString) for f in access.filters):
+        access.addFilter(DropQueryString())
     init_sentry(settings)
 
     @asynccontextmanager
