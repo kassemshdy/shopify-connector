@@ -63,6 +63,34 @@ def test_a_store_with_its_own_app_connects_through_that_app(
     assert store.status is StoreStatus.CONNECTED
 
 
+PERMANENT = "own-shop-x1y2z3.myshopify.com"
+
+
+def test_a_renamed_store_answering_with_its_permanent_address_connects(
+    client: TestClient, db: Session, settings: Settings, remote: FakeRemote
+) -> None:
+    _own_app(db, settings)
+    _, key, _ = make_tenant(db, settings, "site")
+    state = parse_qs(urlparse(_start(client, key)).query)["state"][0]
+    params = {"code": "abc", "shop": PERMANENT, "state": state, "timestamp": "1"}
+
+    # Anyone else's signature for the permanent address is still refused.
+    for secret in (None, "someone-else"):
+        refused = client.get("/shopify/callback",
+                             params=signed(params, secret) if secret else signed(params),
+                             follow_redirects=False)
+        assert "connected" not in refused.headers.get("location", "")
+    assert db.scalars(select(ShopifyApp)).one().shop_domain == SHOP
+
+    done = client.get("/shopify/callback", params=signed(params, OWN_SECRET),
+                      follow_redirects=False)
+    assert done.headers["location"].endswith("shopify=connected")
+    assert db.scalars(select(Store)).one().shop_domain == PERMANENT
+    # Webhooks and launches use the permanent address from now on.
+    assert db.scalars(select(ShopifyApp)).one().shop_domain == PERMANENT
+    assert apps.secrets_for(db, settings, PERMANENT)[0] == OWN_SECRET
+
+
 def test_other_stores_still_use_the_default_app(
     client: TestClient, db: Session, settings: Settings
 ) -> None:

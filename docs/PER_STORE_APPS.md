@@ -39,6 +39,14 @@ Remove it on the operator page and uninstall it from the store. The store's
 connection keeps working until it is next reconnected, which then uses the
 default app.
 
+## A renamed store
+
+A store keeps its first `*.myshopify.com` address for good; a new name only
+adds an address that redirects to it, and Shopify answers with the first one.
+Register and connect the store under either: when Shopify answers with the
+permanent address and its signature checks out with the store's own app, the
+connector accepts it and moves the app to that address.
+
 ## Order matters
 
 Register the app on the operator page (step 4) **before** installing it
