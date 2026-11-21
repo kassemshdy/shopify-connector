@@ -66,6 +66,18 @@ class StoreOut(BaseModel):
     signup_url: str | None
 
 
+class DetailRow(BaseModel):
+    label: str = Field(min_length=1, max_length=120)
+    value: str = Field(min_length=1, max_length=2000)
+
+
+class ProductDetails(BaseModel):
+    """Labelled facts shown under the description, in the website's own words."""
+
+    heading: str | None = Field(default=None, max_length=255)
+    rows: list[DetailRow] = Field(default_factory=list, max_length=20)
+
+
 class ProductIn(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=20000)
@@ -74,6 +86,9 @@ class ProductIn(BaseModel):
     images: list[HttpUrl] = Field(default_factory=list, max_length=20)
     available: bool = True
     vendor: str | None = Field(default=None, max_length=255)
+    product_type: str | None = Field(default=None, max_length=255)
+    tags: list[str] = Field(default_factory=list, max_length=20)
+    details: ProductDetails | None = None
 
     def desired(self) -> dict[str, object]:
         return {
@@ -84,6 +99,9 @@ class ProductIn(BaseModel):
             "images": [str(u) for u in self.images],
             "available": self.available,
             "vendor": self.vendor,
+            "product_type": self.product_type,
+            "tags": [t.strip()[:255] for t in self.tags if t.strip()],
+            "details": self.details.model_dump() if self.details and self.details.rows else None,
         }
 
 
