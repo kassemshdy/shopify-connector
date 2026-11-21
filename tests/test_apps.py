@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.errors import Conflict
+from app.errors import Conflict, Invalid
 from app.models import Installation, ShopifyApp, Store, StoreStatus
 from app.services import apps
 from tests.conftest import FakeRemote, auth, make_tenant, signed
@@ -114,6 +114,16 @@ def test_the_secret_is_stored_encrypted_and_duplicates_are_refused(
     assert OWN_SECRET not in stored.secret_enc
     with pytest.raises(Conflict):
         _own_app(db, settings)
+
+
+def test_the_default_apps_client_id_is_refused_for_a_store(
+    db: Session, settings: Settings
+) -> None:
+    assert settings.shopify_api_key
+    with pytest.raises(Invalid):
+        apps.add(db, settings, shop=SHOP, client_id=settings.shopify_api_key,
+                 secret="anything", name="Wrong")
+    assert db.scalars(select(ShopifyApp)).first() is None
 
 
 @pytest.fixture

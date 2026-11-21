@@ -25,7 +25,11 @@ def callback(request: Request, db: DbSession, settings: ShopifySettings, http: H
     try:
         return RedirectResponse(service.complete_connect(params))
     except AppError as exc:
-        logger.warning("Shopify callback refused: %s", exc.code)
+        shop = params.get("shop", "")
+        own = apps.for_shop(db, settings, shop)
+        logger.warning("Shopify callback refused: %s (shop %s, %s app)", exc.code,
+                       shop[:120], "own" if own and own.client_id != settings.shopify_api_key
+                       else "default")
         try:
             return RedirectResponse(with_status(service.read_state(params.get("state", ""))["ret"],
                                                 exc.code))
