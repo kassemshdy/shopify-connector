@@ -57,7 +57,7 @@ def test_the_page_carries_the_apps_name(client: TestClient) -> None:
 def test_the_privacy_and_support_pages_are_public_and_name_the_contact_when_set(
     client: TestClient, settings: Settings
 ) -> None:
-    for path in ("/privacy", "/support"):
+    for path in ("/privacy", "/support", "/terms"):
         page = client.get(path)
         assert page.status_code == 200 and settings.app_name in page.text
         assert "frame-ancestors 'none'" in page.headers["content-security-policy"]
@@ -95,3 +95,9 @@ def test_a_page_off_the_website_is_refused(
               "page_url": "https://evil.test/phish"},
     )
     assert started.status_code == 422
+
+
+def test_the_terms_state_roles_sub_processors_and_breach_notice(client: TestClient) -> None:
+    page = client.get("/terms").text
+    for words in ("processor", "Sub-processors", "Yalla Pay", "72 hours", "never sell"):
+        assert words in page

@@ -176,7 +176,7 @@ def home(request: Request, db: DbSession, settings: AppSettings, http: Http) -> 
     return _response(_page(body, settings.app_name, api_key=settings.shopify_api_key), frame)
 
 
-# PLACEHOLDER COPY: the two pages below are written to pass Shopify's review and
+# PLACEHOLDER COPY: the pages below are written to pass Shopify's review and
 # say only what the code does; the owners have not yet chosen their wording.
 _UPDATED = "6 November 2026"
 
@@ -214,7 +214,60 @@ reports go to Sentry with personal data removed.</p>
 <h2>Deletion</h2>
 <p>Uninstalling the app deletes the access token at once. 48 hours later Shopify
 asks us to erase the store, and every record of it is deleted.</p>
-<h2>Contact</h2>{_contact(settings)}"""
+<h2>Contact</h2>{_contact(settings)}
+<p><a href="/terms">Merchant terms and data processing</a></p>"""
+    return _response(_page(body, settings.app_name), "'none'")
+
+
+@router.get("/terms")
+def terms(settings: AppSettings) -> HTMLResponse:
+    """The agreement a merchant accepts by installing: terms and data processing."""
+    name = escape(settings.app_name)
+    body = f"""<h1>{name} merchant terms and data processing</h1>
+<p>Last updated {_UPDATED}.</p>
+<p>These terms apply to every merchant who installs {name} on a Shopify store.
+Installing or keeping the app installed means accepting them. {name} is operated by
+Halyoon ("we").</p>
+<h2>1. The service</h2>
+<p>{name} connects a merchant's Shopify store to the directory website where the
+merchant's shop is listed: it sends the products managed on that website to the store,
+can set the store's market, delivery rate, logo and social links when the website asks,
+and lets our payment partner Yalla Pay take payments and create the resulting orders.</p>
+<h2>2. Roles</h2>
+<p>For the personal data of the merchant's customers, the merchant is the controller and
+we act as a processor on the merchant's behalf. We process it only to provide the
+service described above, on the merchant's instructions given through Shopify and the
+directory website, and never sell it or use it for advertising.</p>
+<h2>3. What is processed</h2>
+<p>Customer name, email, phone number and shipping or billing address, and the orders
+they belong to, only as far as needed to create orders, calculate shipping and deliver
+them. The connector itself stores none of it; see the <a href="/privacy">privacy
+policy</a> for what it does store.</p>
+<h2>4. Sub-processors</h2>
+<ul>
+<li>Yalla Pay: payments and order creation, under its own terms and policy.</li>
+<li>Railway: hosting of the service and its database.</li>
+<li>Cloudflare: DNS and network protection.</li>
+<li>Sentry: error reports, with personal data removed.</li>
+</ul>
+<p>We will publish a change to this list here before it takes effect.</p>
+<h2>5. Security</h2>
+<p>Data travels only over HTTPS, store access tokens are encrypted at rest, access to
+production systems is limited to the people who operate them, and logs and error reports
+exclude personal data.</p>
+<h2>6. Retention and deletion</h2>
+<p>Uninstalling the app deletes the store's access token at once. When Shopify asks us
+to erase a store's or a customer's data, we do so and confirm. Yalla Pay keeps the order
+records it needs under its own retention policy.</p>
+<h2>7. Incidents</h2>
+<p>If we learn of a breach affecting a merchant's data, we will tell the merchant
+without undue delay, and within 72 hours, with what we know and what we are doing.</p>
+<h2>8. The merchant's part</h2>
+<p>The merchant tells its customers, in its own store's privacy policy, that their data
+is used to process and deliver their orders, and has the right to do so.</p>
+<h2>9. Changes and contact</h2>
+<p>We may update these terms; the date above shows the latest version.</p>
+{_contact(settings)}"""
     return _response(_page(body, settings.app_name), "'none'")
 
 
@@ -226,5 +279,6 @@ def support(settings: AppSettings) -> HTMLResponse:
 shop is listed. Open the app in your Shopify admin to see whether the store is connected
 and how the product sync is going.</p>
 <h2>Contact</h2>{_contact(settings)}
-<p><a href="/privacy">Privacy policy</a></p>"""
+<p><a href="/privacy">Privacy policy</a> &middot;
+<a href="/terms">Merchant terms and data processing</a></p>"""
     return _response(_page(body, settings.app_name), "'none'")
