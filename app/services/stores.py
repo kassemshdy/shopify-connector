@@ -32,7 +32,7 @@ from app.cloudflare import RESERVED, SUBDOMAIN, CloudflareDns, CloudflareError
 from app.config import Settings
 from app.crypto import decrypt, encrypt
 from app.errors import Conflict, Invalid, NotFound
-from app.models import Installation, Product, Store, StoreStatus, Tenant
+from app.models import Installation, Product, ShopifyApp, Store, StoreStatus, Tenant
 from app.services import apps, events
 from app.services.sync import client_for, refresh_shop, register_webhooks
 
@@ -136,6 +136,28 @@ class StoreService:
             raise Invalid("no_app", "No Shopify app is configured for this store.")
         return creds
 
+    def _adopt_permanent_address(self, params: dict[str, str], asked: str) -> bool:
+        """A renamed store answers with its permanent address, not the name it was
+        registered and connected under. Accept that only when Shopify's signature
+        checks out with the app registered for the asked name: a custom app installs
+        on one store alone, so the answer is that store. The app then moves to the
+        permanent address, which webhooks and launches also use."""
+        shop = params.get("shop", "")
+        if not asked or asked == shop:
+            return False
+        app = self.db.scalars(select(ShopifyApp).where(ShopifyApp.shop_domain == asked)).first()
+        if app is None or self.db.scalars(
+            select(ShopifyApp).where(ShopifyApp.shop_domain == shop)
+        ).first() is not None:
+            return False
+        if not shopify.verify_query_hmac(params, decrypt(self.settings, app.secret_enc)):
+            return False
+        app.shop_domain = shop
+        self.db.flush()
+        logger.info("Store app moved to its permanent address",
+                    extra={"from": asked, "to": shop})
+        return True
+
     def install_from_launch(self, shop: str, session_token: str) -> Installation:
         """Keep the token of a store that installed the app from Shopify (token exchange)."""
         creds = self._creds(shop)
@@ -209,10 +231,13 @@ class StoreService:
         shop_param = params.get("shop", "")
         if not shopify.is_shop_domain(shop_param):
             raise Invalid("bad_hmac", "Shopify's signature did not match.")
+        claims = self.read_state(params.get("state", ""))
         creds = self._creds(shop_param)
         if not shopify.verify_query_hmac(params, creds.secret):
-            raise Invalid("bad_hmac", "Shopify's signature did not match.")
-        claims = self.read_state(params.get("state", ""))
+            if not self._adopt_permanent_address(params, str(claims.get("shop", ""))):
+                raise Invalid("bad_hmac", "Shopify's signature did not match.")
+            creds = self._creds(shop_param)
+            claims["shop"] = shop_param
         return_url = str(claims["ret"])
         shop = params.get("shop", "")
         if not shopify.is_shop_domain(shop) or shop != claims.get("shop"):
