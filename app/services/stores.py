@@ -33,7 +33,7 @@ from app.config import Settings
 from app.crypto import decrypt, encrypt
 from app.errors import Conflict, Invalid, NotFound
 from app.models import Installation, Product, Store, StoreStatus, Tenant
-from app.services import events
+from app.services import apps, events
 from app.services.sync import client_for, refresh_shop, register_webhooks
 
 logger = logging.getLogger(__name__)
@@ -121,22 +121,28 @@ class StoreService:
         ).first()
         if installed is not None:
             return self._link_installation(tenant, store, installed, return_url)
-        assert self.settings.shopify_api_key
+        creds = self._creds(shop)
         return shopify.authorize_url(
             shop,
-            api_key=self.settings.shopify_api_key,
+            api_key=creds.client_id,
             scopes=self.settings.shopify_scopes,
             redirect_uri=self.settings.public_base_url.rstrip("/") + CALLBACK_PATH,
             state=state,
         )
 
+    def _creds(self, shop: str) -> apps.Credentials:
+        creds = apps.for_shop(self.db, self.settings, shop)
+        if creds is None:
+            raise Invalid("no_app", "No Shopify app is configured for this store.")
+        return creds
+
     def install_from_launch(self, shop: str, session_token: str) -> Installation:
         """Keep the token of a store that installed the app from Shopify (token exchange)."""
-        assert self.settings.shopify_api_key and self.settings.shopify_api_secret
+        creds = self._creds(shop)
         token, scopes = shopify.token_exchange(
             self.http, shop,
-            api_key=self.settings.shopify_api_key,
-            api_secret=self.settings.shopify_api_secret,
+            api_key=creds.client_id,
+            api_secret=creds.secret,
             session_token=session_token,
         )
         installed = self.db.scalars(
@@ -200,8 +206,11 @@ class StoreService:
 
     def complete_connect(self, params: dict[str, str]) -> str:
         """Return the URL to send the owner's browser to."""
-        assert self.settings.shopify_api_key and self.settings.shopify_api_secret
-        if not shopify.verify_query_hmac(params, self.settings.shopify_api_secret):
+        shop_param = params.get("shop", "")
+        if not shopify.is_shop_domain(shop_param):
+            raise Invalid("bad_hmac", "Shopify's signature did not match.")
+        creds = self._creds(shop_param)
+        if not shopify.verify_query_hmac(params, creds.secret):
             raise Invalid("bad_hmac", "Shopify's signature did not match.")
         claims = self.read_state(params.get("state", ""))
         return_url = str(claims["ret"])
@@ -225,8 +234,8 @@ class StoreService:
         token, scopes = shopify.exchange_code(
             self.http,
             shop,
-            api_key=self.settings.shopify_api_key,
-            api_secret=self.settings.shopify_api_secret,
+            api_key=creds.client_id,
+            api_secret=creds.secret,
             code=params.get("code", ""),
         )
         if store.shop_domain and store.shop_domain != shop:

@@ -27,6 +27,7 @@ import hashlib
 import hmac
 import re
 import time
+import uuid
 from collections import defaultdict, deque
 from html import escape
 from typing import Annotated, Any
@@ -40,9 +41,17 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import AppSettings, DbSession
 from app.config import Settings, get_settings
-from app.errors import NotFound
-from app.models import Product, Store, StoreStatus, SyncState, Tenant, WebhookDelivery
-from app.services import tenants
+from app.errors import AppError, NotFound
+from app.models import (
+    Product,
+    ShopifyApp,
+    Store,
+    StoreStatus,
+    SyncState,
+    Tenant,
+    WebhookDelivery,
+)
+from app.services import apps, tenants
 
 router = APIRouter(prefix="/operator", include_in_schema=False)
 
@@ -312,7 +321,8 @@ def index(db: DbSession, op: Op) -> HTMLResponse:
     return _page("Websites", f"""<h1>Websites</h1>
 <section><table><tr><th>Website</th><th>State</th><th>Stores connected / all</th>
 <th>Subdomains</th><th>Webhooks</th><th>Key</th></tr>{rows}</table>
-<div class="row"><a class="button" href="/operator/sites/new">Add a website</a></div></section>""",
+<div class="row"><a class="button" href="/operator/sites/new">Add a website</a>
+<a class="button secondary" href="/operator/apps">Shopify apps per store</a></div></section>""",
         op)
 
 
@@ -576,3 +586,71 @@ async def toggle_active(
     tenant.active = not tenant.active
     db.commit()
     return RedirectResponse(f"/operator/sites/{tenant.slug}", status_code=303)
+
+
+# -- Shopify apps, one per store (custom distribution) -------------------------
+
+def _apps_page(db: Session, op: Operator, *, form: dict[str, str] | None = None,
+               error: str = "") -> HTMLResponse:
+    form = form or {}
+    rows = ""
+    for app in db.scalars(select(ShopifyApp).order_by(ShopifyApp.shop_domain)):
+        rows += (
+            f"<tr><td>{escape(app.shop_domain)}</td><td>{escape(app.name)}</td>"
+            f"<td><code>{escape(app.client_id)}</code></td><td>{_when(app.created_at)}</td>"
+            f'<td><form method="post" action="/operator/apps/{app.id}/delete" style="margin:0">'
+            f'{_hidden(op)}<button class="danger">Remove</button>'
+            f"</form></td></tr>"
+        )
+    if not rows:
+        rows = '<tr><td colspan="5" class="muted">No per-store apps yet.</td></tr>'
+    err = f'<p class="error">{escape(error)}</p>' if error else ""
+    v = {k: escape(form.get(k, "")) for k in ("shop", "name", "client_id")}
+    return _page("Shopify apps", f"""<h1>Shopify apps per store</h1>
+<section><p class="muted">A store listed here is installed, connected and checked with its own
+app (custom distribution). Every other store uses the default app
+(<code>SHOPIFY_API_KEY</code>). The secret is stored encrypted and never shown again.</p>
+<table><tr><th>Store</th><th>App name</th><th>Client id</th><th>Added</th><th></th></tr>
+{rows}</table></section>
+<section><h2>Add a store's app</h2>{err}
+<form method="post" action="/operator/apps">{_hidden(op)}
+<label>Store address<input name="shop" value="{v["shop"]}"
+ placeholder="name.myshopify.com" required></label>
+<label>App name<input name="name" value="{v["name"]}" placeholder="Janoubona - Shop name"></label>
+<label>Client id<input name="client_id" value="{v["client_id"]}" required></label>
+<label>Client secret<input name="secret" type="password" autocomplete="off" required></label>
+<div class="row"><button>Add app</button></div></form></section>""", op)
+
+
+@router.get("/apps")
+def apps_page(db: DbSession, op: Op) -> HTMLResponse:
+    return _apps_page(db, op)
+
+
+@router.post("/apps")
+async def add_app(
+    request: Request, db: DbSession, settings: AppSettings, op: Op
+) -> Response:
+    form = await checked_form(request, op)
+    try:
+        apps.add(db, settings, shop=form.get("shop", ""), client_id=form.get("client_id", ""),
+                 secret=form.get("secret", ""), name=form.get("name", ""))
+    except AppError as exc:
+        return _apps_page(db, op, form=form, error=exc.message)
+    return RedirectResponse("/operator/apps", status_code=303)
+
+
+@router.post("/apps/{app_id}/delete")
+async def delete_app(
+    app_id: str, request: Request, db: DbSession, op: Op
+) -> Response:
+    await checked_form(request, op)
+    try:
+        key = uuid.UUID(app_id)
+    except ValueError:
+        return RedirectResponse("/operator/apps", status_code=303)
+    app = db.get(ShopifyApp, key)
+    if app is not None:
+        db.delete(app)
+        db.commit()
+    return RedirectResponse("/operator/apps", status_code=303)

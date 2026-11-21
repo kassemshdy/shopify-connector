@@ -21,6 +21,7 @@ from sqlalchemy import func, select
 from app import shopify
 from app.api.deps import AppSettings, DbSession, Http
 from app.models import Installation, Product, Store, StoreStatus, SyncState
+from app.services import apps
 from app.services.stores import StoreService
 from app.shopify import is_shop_domain, verify_query_hmac
 
@@ -89,13 +90,15 @@ def home(request: Request, db: DbSession, settings: AppSettings, http: Http) -> 
         age = float("inf")
     launched = bool(
         is_shop_domain(shop)
-        and any(verify_query_hmac(params, s) for s in settings.shopify_secrets())
+        and any(verify_query_hmac(params, s) for s in apps.secrets_for(db, settings, shop))
         and age <= LAUNCH_MAX_AGE_SECONDS
     )
     if not launched:
         return _response(_page(_generic(settings.app_name), settings.app_name), "'none'")
 
     frame = f"https://{shop} https://admin.shopify.com"
+    creds = apps.for_shop(db, settings, shop)
+    app_key = creds.client_id if creds else None
     store = db.scalars(select(Store).where(Store.shop_domain == shop)).first()
     if store is None or store.status is not StoreStatus.CONNECTED:
         # Installed from Shopify (managed install): keep the store's token now,
@@ -103,10 +106,9 @@ def home(request: Request, db: DbSession, settings: AppSettings, http: Http) -> 
         session_token = params.get("id_token", "")
         if (
             session_token
-            and settings.shopify_api_key
-            and shopify.verify_session_token(
-                session_token, settings.shopify_api_key, settings.shopify_secrets()
-            ) == shop
+            and creds is not None
+            and shopify.verify_session_token(session_token, creds.client_id, [creds.secret])
+            == shop
         ):
             try:
                 StoreService(db, settings, http).install_from_launch(shop, session_token)
@@ -125,7 +127,7 @@ def home(request: Request, db: DbSession, settings: AppSettings, http: Http) -> 
                 "appear here once it does. There is nothing else to do.</p>"
             )
             return _response(
-                _page(body, settings.app_name, api_key=settings.shopify_api_key), frame
+                _page(body, settings.app_name, api_key=app_key), frame
             )
     if store is None or store.status is not StoreStatus.CONNECTED:
         body = (
@@ -134,7 +136,7 @@ def home(request: Request, db: DbSession, settings: AppSettings, http: Http) -> 
             "dashboard on the website where it is listed and connect this store "
             "from there; your products will then appear here.</p>"
         )
-        return _response(_page(body, settings.app_name, api_key=settings.shopify_api_key), frame)
+        return _response(_page(body, settings.app_name, api_key=app_key), frame)
 
     counts: dict[SyncState, int] = {
         state: count
@@ -173,7 +175,7 @@ def home(request: Request, db: DbSession, settings: AppSettings, http: Http) -> 
             f'<a class="button" href="{escape(tenant.origins[0])}" target="_top" '
             f'rel="noopener">Open {escape(tenant.name)}</a>'
         )
-    return _response(_page(body, settings.app_name, api_key=settings.shopify_api_key), frame)
+    return _response(_page(body, settings.app_name, api_key=app_key), frame)
 
 
 # PLACEHOLDER COPY: the pages below are written to pass Shopify's review and
