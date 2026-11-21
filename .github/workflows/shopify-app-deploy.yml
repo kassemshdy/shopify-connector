@@ -1,0 +1,34 @@
+name: Deploy Shopify app configuration
+
+# Pushes an app's shopify.app.<name>.toml to Shopify as a new released app
+# version (scopes, URLs, compliance webhooks). Run by hand from the Actions tab.
+# Needs the repository secret SHOPIFY_CLI_PARTNERS_TOKEN (Partner Dashboard ->
+# Settings -> CLI token); it never appears in the repository.
+
+on:
+  workflow_dispatch:
+    inputs:
+      config:
+        description: "Which app configuration to deploy"
+        required: true
+        default: janoubona-live
+        type: choice
+        options:
+          - janoubona-live
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Deploy
+        env:
+          SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+          CONFIG: ${{ inputs.config }}
+        run: npx --yes @shopify/cli@latest app deploy --config "$CONFIG" --force
