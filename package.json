@@ -1,0 +1,8 @@
+{
+  "name": "halyoon-connect-shopify-app-config",
+  "private": true,
+  "description": "Only so the Shopify CLI can deploy the app configuration files (shopify.app.*.toml).",
+  "scripts": {
+    "deploy:janoubona-live": "shopify app deploy --config janoubona-live --force"
+  }
+}
