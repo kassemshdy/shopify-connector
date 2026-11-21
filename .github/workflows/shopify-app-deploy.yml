@@ -15,6 +15,15 @@ on:
         type: choice
         options:
           - janoubona-live
+          - store
+      client_id:
+        description: "For 'store' only: the store's own app client id (public)"
+        required: false
+        type: string
+      app_name:
+        description: "For 'store' only: the app's name, e.g. Janoubona - Shop name"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -27,6 +36,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Build a store app's configuration from the template
+        if: inputs.config == 'store'
+        env:
+          CLIENT_ID: ${{ inputs.client_id }}
+          APP_NAME: ${{ inputs.app_name }}
+        run: |
+          case "$CLIENT_ID" in (*[!a-f0-9]*|"") echo "client_id must be hex"; exit 1;; esac
+          case "$APP_NAME" in (*[!A-Za-z0-9\ -]*|"") echo "app_name: letters, digits, spaces, hyphens"; exit 1;; esac
+          sed -e "s/__CLIENT_ID__/$CLIENT_ID/" -e "s/__APP_NAME__/$APP_NAME/" \
+            shopify.app.store-template.toml > shopify.app.store.toml
       - name: Deploy
         env:
           SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}

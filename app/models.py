@@ -198,3 +198,20 @@ class Installation(Base, Timestamps):
     access_token_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     scopes: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ShopifyApp(Base, Timestamps):
+    """A Shopify app made for one store (custom distribution), with its credentials.
+
+    Stores with an entry here are installed, connected and verified with that
+    app's client id and secret; every other store uses the default app from
+    the settings (SHOPIFY_API_KEY / SHOPIFY_API_SECRET).
+    """
+
+    __tablename__ = "shopify_apps"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    shop_domain: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    client_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    secret_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, default="")

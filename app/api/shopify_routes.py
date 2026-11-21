@@ -10,6 +10,7 @@ from fastapi.responses import RedirectResponse
 
 from app.api.deps import DbSession, Http, ShopifySettings
 from app.errors import AppError
+from app.services import apps
 from app.services.stores import StoreService, with_status
 from app.shopify import verify_webhook_hmac
 
@@ -38,7 +39,9 @@ async def webhooks(
 ) -> Response:
     body = await request.body()
     header = request.headers.get("X-Shopify-Hmac-Sha256")
-    if not any(verify_webhook_hmac(body, header, s) for s in settings.shopify_secrets()):
+    shop = request.headers.get("X-Shopify-Shop-Domain", "")
+    secrets = apps.secrets_for(db, settings, shop)
+    if not any(verify_webhook_hmac(body, header, s) for s in secrets):
         return Response(status_code=401)
     await run_in_threadpool(
         StoreService(db, settings, http).handle_shopify_webhook,
