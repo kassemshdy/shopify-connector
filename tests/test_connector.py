@@ -171,6 +171,25 @@ def test_products_are_created_once_then_updated_and_unchanged_ones_skipped(
     assert "product.synced" in [d.event for d in deliveries(db)]
 
 
+def test_product_type_tags_and_details_reach_shopify_escaped(
+    client: TestClient, db: Session, settings: Settings, http: httpx.Client, remote: FakeRemote
+) -> None:
+    _, key, _ = make_tenant(db, settings, "alpha")
+    connect(client, key, "alpha")
+    client.put("/v1/stores/shop-1/products/p1", headers=auth(key), json={
+        **PRODUCT, "description": "Fresh", "product_type": "Distillates", "tags": ["Distillates"],
+        "details": {"heading": "Details", "rows": [
+            {"label": "Net weight", "value": "500 ml"},
+            {"label": "Ingredients", "value": "<b>rose</b>\nwater"}]}})
+    drain(settings, http)
+    sent = remote.gql("productSet")[-1]["variables"]["input"]  # type: ignore[index]
+    assert sent["productType"] == "Distillates" and sent["tags"] == ["Distillates"]  # type: ignore[index]
+    body = sent["descriptionHtml"]  # type: ignore[index]
+    assert body.startswith("<p>Fresh</p><h3>Details</h3><ul>")
+    assert "<strong>Net weight:</strong> 500 ml" in body
+    assert "&lt;b&gt;rose&lt;/b&gt;<br>water" in body and "<b>" not in body
+
+
 def test_a_price_in_another_currency_is_never_pushed(
     client: TestClient, db: Session, settings: Settings, http: httpx.Client, remote: FakeRemote
 ) -> None:

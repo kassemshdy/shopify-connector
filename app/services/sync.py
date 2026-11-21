@@ -99,6 +99,24 @@ def _description_html(text: str | None) -> str:
     return "".join("<p>" + html.escape(p).replace("\n", "<br>") + "</p>" for p in paragraphs)
 
 
+def _details_html(details: Any) -> str:
+    """The website's labelled facts as a list under the description."""
+    if not isinstance(details, dict):
+        return ""
+    rows = [r for r in details.get("rows") or []
+            if isinstance(r, dict) and r.get("label") and r.get("value")]
+    if not rows:
+        return ""
+    items = "".join(
+        "<li><strong>" + html.escape(str(r["label"])) + ":</strong> "
+        + html.escape(str(r["value"])).replace("\n", "<br>") + "</li>"
+        for r in rows
+    )
+    heading = details.get("heading")
+    top = "<h3>" + html.escape(str(heading)) + "</h3>" if heading else ""
+    return top + "<ul>" + items + "</ul>"
+
+
 def product_input(product: Product) -> dict[str, Any]:
     d = product.desired
     store = product.store
@@ -108,7 +126,8 @@ def product_input(product: Product) -> dict[str, Any]:
         raise SkipProduct(f"priced in {d['currency']}, the store sells in {store.currency}")
     data: dict[str, Any] = {
         "title": d["title"],
-        "descriptionHtml": _description_html(d.get("description")),
+        "descriptionHtml": _description_html(d.get("description"))
+        + _details_html(d.get("details")),
         "status": "ACTIVE" if d.get("available", True) else "DRAFT",
         "productOptions": [{"name": "Title", "values": [{"name": "Default Title"}]}],
         "variants": [
@@ -120,6 +139,10 @@ def product_input(product: Product) -> dict[str, Any]:
     }
     if d.get("vendor"):
         data["vendor"] = d["vendor"]
+    if d.get("product_type"):
+        data["productType"] = d["product_type"]
+    if d.get("tags"):
+        data["tags"] = list(d["tags"])
     images = [u for u in d.get("images") or [] if isinstance(u, str) and u.startswith("https://")]
     if images:
         data["files"] = [

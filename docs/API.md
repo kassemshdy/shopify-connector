@@ -171,9 +171,18 @@ Writes the shop's logo and social links into its store's live theme.
   "currency": "USD",
   "images": ["https://your-site/media/zaatar.jpg"],
   "available": true,
-  "vendor": "Abu Khalil Bakery"
+  "vendor": "Abu Khalil Bakery",
+  "product_type": "Bread",
+  "tags": ["Bread"],
+  "details": {
+    "heading": "Details",
+    "rows": [{"label": "Net weight", "value": "120 g"}]
+  }
 }
 ```
+
+- `product_type` and `tags` become Shopify's *Product type* and tags, which automatic collections can filter on.
+- `details` is added under the description as a heading and a list, in the website's own labels; every value is escaped.
 
 - The response is the product's state, `QUEUED` at first.
 - Images must be public `https://` URLs; Shopify downloads them.
