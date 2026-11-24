@@ -158,9 +158,13 @@ def test_products_are_created_once_then_updated_and_unchanged_ones_skipped(
     got = client.get("/v1/stores/shop-1/products/p1", headers=auth(key)).json()
     assert got["buy_url"] == "https://souk.example.com/products/zaatar"
 
+    synced = [d.event for d in deliveries(db)].count("product.synced")
     client.put("/v1/stores/shop-1/products/p1", headers=auth(key), json=PRODUCT)
     drain(settings, http)
     assert len(remote.gql("productSet")) == 1  # nothing Shopify sees changed
+    # ...but the website hears again that it is in the store, buy link included,
+    # so a resend undoes an earlier failure report.
+    assert [d.event for d in deliveries(db)].count("product.synced") == synced + 1
 
     client.put("/v1/stores/shop-1/products/p1", headers=auth(key),
                json={**PRODUCT, "price": "7.25"})
