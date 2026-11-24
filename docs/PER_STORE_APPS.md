@@ -19,7 +19,9 @@ minutes per store, most of it in Shopify's admin.
    skipped until this is changed. Settings → General → **⋯** beside *Currency
    display* → **Change store currency → USD**. Only possible before the first
    sale.
-3. On the same page: time zone **Beirut** (it starts on US Eastern), and the
+3. On the same page: time zone **(GMT+02:00) Athens** (Shopify's list has no
+   Beirut; Athens keeps the same hour and changes for summer on the same
+   days; it starts on US Eastern), and the
    shop's square logo under **Brand → Logo** (Yalla Pay shows it as the store's
    picture).
 4. **Shipping.** Shopify adds its own rate, named «قياسي» ($4, free over $45)
