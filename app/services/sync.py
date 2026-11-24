@@ -172,9 +172,13 @@ def push(db: Session, product: Product, client: ShopifyClient) -> None:
         return
     digest = content_hash(data)
     if product.shopify_product_id and product.synced_hash == digest:
-        # Nothing Shopify sees changed: no call, and the state is what it was.
+        # Nothing Shopify sees changed: no call. The website is still told the
+        # product is in the store, with its buy link: a failure it heard about
+        # earlier (a store blocked over billing answers 402) made it hide the
+        # link, and only this report brings it back.
         product.state = SyncState.SYNCED
         product.last_error = None
+        events.emit(db, store.tenant_id, "product.synced", events.product_payload(product))
         return
     created = product.shopify_product_id is None
     if not created:
